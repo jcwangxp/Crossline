@@ -25,7 +25,7 @@ When should you use Crossline:
 ## Features and Highlights
 * Support Windows, Linux, vt100 and xterm.
 * Support total `79 shortcuts` and `37 functions`.
-* Support most readline shortcuts (Emacs Standard bindings): fast move, edit, cut&paste, complete, history, control.
+* Support most readline shortcuts (Emacs Standard bindings): move, edit, cut&paste, complete, history, control.
 * Support some Windows command line shortcuts and extend some new convenient shortcuts.
 * Support history navigation, history show/clear and history save/load.
 * Support autocomplete, key word help and syntax hints.
@@ -159,14 +159,14 @@ Original readline supports incremental search(`Ctrl-R`,`Ctrl-S`) and none-increm
 **Patterns syntax**
 You can press `F1` to get help.
 Patterns are separated by `' '`, patter match is `case insensitive`.
-* `select`:   choose line including 'select'
-* `-select`:  choose line excluding 'select'
-* `"select from"`:  choose line including "select from"
-* `-"select from"`: choose line excluding "select from"
-* `"select from" where -"order by" -limit` : choose line including "select from" and 'where' and excluding "order by" or 'limit'
+* `select`:   choose line including `select`
+* `-select`:  choose line excluding `select`
+* `"select from"`:  choose line including `select from`
+* `-"select from"`: choose line excluding `select from`
+* `"select from" where -"order by" -limit` : choose line including `select from` and `where` and excluding `order by` or `limit`
 
 **Select history**
-* If only one history is found, id `"1"` is provided automatically, and you just press `Enter` to select.
+* If only one history is found, id `1` is provided automatically, and you just press `Enter` to select.
 * You can press `Ctrl-C` to skip choosing.
 * You can press `Enter` or `Ctrl-D` on empty line to skip choosing.
 
@@ -178,6 +178,7 @@ Patterns are separated by `' '`, patter match is `case insensitive`.
        3  from select table
        4  SELECT from student
        5  Select from teacher
+
     SQL> <Ctrl+R>
     Input Patterns <F1> help: select from
        1  select from user
@@ -186,6 +187,7 @@ Patterns are separated by `' '`, patter match is `case insensitive`.
        4  Select from teacher
     Input history id: 3
     SQL> SELECT from student<Alt+R> // Revert line
+
     SQL> <F4>
     Input Patterns <F1> help: <Insert> // paste last history pattern: select from
     Input Patterns <F1> help: "select from"
@@ -194,6 +196,7 @@ Patterns are separated by `' '`, patter match is `case insensitive`.
        3  Select from teacher
     Input history id: 3
     SQL> Select from teacher<Alt+R>
+
     SQL> SELECT from<F4> // search with pattern: Select from
     Input Patterns <F1> help: SELECT from
     Input Patterns <F1> help: "SELECT from" -user -teacher
@@ -370,24 +373,26 @@ help {insert | select | update | delete | create | drop | show | describe | help
 ```
 You can use this example to practice the shortcuts above.
 
-     SQL> <TAB>  // show autocomplete words and help
-     insert      Insert a record to table
-     select      Select records from table
-     update      Update records in table
-     delete      Delete records from table
-     create      Create index on table
-     drop        Drop index or table
-     show        Show tables or databases
-     describe    Show table schema
-     help        Show help for topic
-     exit        Exit shell
-     history     Show history
-      *** Press <Space> or <Enter> to continue . . .
-     SQL> help <TAB> // show autocomplete words list
-     insert    select    update    delete    create    drop      show
-     describe  help      exit      history
-     SQL> create index <TAB> // show autocomplete hints
-     Please input: index name
+    SQL> <TAB>  // show autocomplete words and help
+    insert      Insert a record to table
+    select      Select records from table
+    update      Update records in table
+    delete      Delete records from table
+    create      Create index on table
+    drop        Drop index or table
+    show        Show tables or databases
+    describe    Show table schema
+    help        Show help for topic
+    exit        Exit shell
+    history     Show history
+     *** Press <Space> or <Enter> to continue . . .
+
+    SQL> help <TAB> // show autocomplete words list
+    insert    select    update    delete    create    drop      show
+    describe  help      exit      history
+
+    SQL> create index <TAB> // show autocomplete hints
+    Please input: index name
 
 ## Build and Test
 On Windows, you can add the source code to a Visual Studio project to build or enter `Tools Command Prompt for VS` from menu to build in command line which is more efficient.
