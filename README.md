@@ -1,5 +1,4 @@
 Crossline
-
 =========
 **Crossline** is a small, self-contained, zero-config, MIT licensed, cross-platform, readline and libedit replacement.
 
@@ -43,77 +42,77 @@ Shortcuts
 
 **Misc Commands**
 
-Shortcut                    | Action
-------------------------    | --------------------------------
-    F1                      |   Show edit shortcuts help.
-    Ctrl-^                  |   Enter keyboard debugging mode.  
+Shortcut                | Action
+---------               | ------
+F1                      |   Show edit shortcuts help.
+Ctrl-^                  |   Enter keyboard debugging mode.  
 
 **Move Commands**
 
-Shortcut                    | Action
-------------------------    | --------------------------------
-    Ctrl-B, Left            |   Move back a character.
-    Ctrl-F, Right           |   Move forward a character.
-    Alt-B, ESC+Left, Ctrl-Left, Alt-Left    | Move back a word. (Ctrl-Left, Alt-Left only support Windows/Xterm)
-    Alt-F, ESC+Right, Ctrl-Right, Alt-Right | Move forward a word. (Ctrl-Right, Alt-Right only support Windows/Xterm)
-    Ctrl-A, Home            |   Move cursor to start of line.
-    Ctrl-E, End             |   Move cursor to end of line.
-    Ctrl-L                  |   Clear screen and redisplay line.
+Shortcut                | Action
+---------               | ------
+Ctrl-B, Left            |   Move back a character.
+Ctrl-F, Right           |   Move forward a character.
+Alt-B, ESC+Left, Ctrl-Left, Alt-Left    | Move back a word. (Ctrl-Left, Alt-Left only support Windows/Xterm)
+Alt-F, ESC+Right, Ctrl-Right, Alt-Right | Move forward a word. (Ctrl-Right, Alt-Right only support Windows/Xterm)
+Ctrl-A, Home            |   Move cursor to start of line.
+Ctrl-E, End             |   Move cursor to end of line.
+Ctrl-L                  |   Clear screen and redisplay line.
 
 **Edit Commands**
 
-Shortcut                    | Action
-------------------------    | --------------------------------
-    Ctrl-H, Backspace       |   Delete character before cursor.
-    Ctrl-D, DEL             |   Delete character under cursor.
-    Alt-U,  ESC+Up, Ctrl-Up, Alt-Up      | Uppercase current or following word.(Ctrl-Up, Alt-Up only supports Windows/Xterm)
-    Alt-L, ESC+Down, Ctrl-Down, Alt-Down | Lowercase current or following word. (Ctrl-Down, Alt-Down only support Windows/Xterm)
-    Alt-C                   |   Capitalize current or following word.
-    Alt-\                   |   Delete whitespace around cursor.
-    Ctrl-T                  |   Transpose previous character with current character.
+Shortcut                | Action
+---------               | ------
+Ctrl-H, Backspace       |   Delete character before cursor.
+Ctrl-D, DEL             |   Delete character under cursor.
+Alt-U,  ESC+Up, Ctrl-Up, Alt-Up      | Uppercase current or following word.(Ctrl-Up, Alt-Up only supports Windows/Xterm)
+Alt-L, ESC+Down, Ctrl-Down, Alt-Down | Lowercase current or following word. (Ctrl-Down, Alt-Down only support Windows/Xterm)
+Alt-C                   |   Capitalize current or following word.
+Alt-\                   |   Delete whitespace around cursor.
+Ctrl-T                  |   Transpose previous character with current character.
 
 **Cut&Paste Commands**
 
-Shortcut                    | Action
-------------------------    | --------------------------------
-    Ctrl-K, ESC+End, Ctrl-End, Alt-End       | Cut from cursor to end of line. (Ctrl-End, Alt-End only support Windows/Xterm)
-    Ctrl-U, ESC+Home, Ctrl-Home, Alt-Home    | Cut from start of line to cursor. (Ctrl-Home, Alt-Home only support Windows/Xterm)
-    Ctrl-X                  |   Cut whole line.
+Shortcut                | Action
+---------               | ------
+Ctrl-K, ESC+End, Ctrl-End, Alt-End       | Cut from cursor to end of line. (Ctrl-End, Alt-End only support Windows/Xterm)
+Ctrl-U, ESC+Home, Ctrl-Home, Alt-Home    | Cut from start of line to cursor. (Ctrl-Home, Alt-Home only support Windows/Xterm)
+Ctrl-X                  |   Cut whole line.
 Alt-Backspace, Esc+Backspace, Clt-Backspace  | Cut word to left of cursor. (Clt-Backspace only supports Windows/Xterm)
-    Alt-D, ESC+Del, Alt-Del, Ctrl-Del        | Cut word following cursor. (Alt-Del,Ctrl-Del only support Windows/Xterm)
-    Ctrl-W                  |   Cut to left till whitespace (not word).
-    Ctrl-Y, Ctrl-V, Insert  |   Paste last cut text.
+Alt-D, ESC+Del, Alt-Del, Ctrl-Del        | Cut word following cursor. (Alt-Del,Ctrl-Del only support Windows/Xterm)
+Ctrl-W                  |   Cut to left till whitespace (not word).
+Ctrl-Y, Ctrl-V, Insert  |   Paste last cut text.
 
   **Complete Commands**
 
-Shortcut                    | Action
-------------------------    | --------------------------------
-    TAB, Ctrl-I             |   Autocomplete.
-    Alt-=, Alt-?            |   List possible completions.
+Shortcut                | Action
+---------               | ------
+TAB, Ctrl-I             |   Autocomplete.
+Alt-=, Alt-?            |   List possible completions.
 
   **History Commands**
 
-Shortcut                    | Action
-------------------------    | --------------------------------
-    Ctrl-P, Up              |   Fetch previous line in history.
-    Ctrl-N, Down            |   Fetch next line in history.
-    Alt-<,  PgUp            |   Move to first line in history.
-    Alt->,  PgDn            |   Move to end of input history.
-    Ctrl-R, Ctrl-S          |   Search history.
-    F4                      |   Search history with current input.
-    F1                      |   Show search help when in search mode.
-    F2                      |   Show history.
-    F3                      |   Clear history (need confirm).
+Shortcut                | Action
+---------               | ------
+Ctrl-P, Up              |   Fetch previous line in history.
+Ctrl-N, Down            |   Fetch next line in history.
+Alt-<,  PgUp            |   Move to first line in history.
+Alt->,  PgDn            |   Move to end of input history.
+Ctrl-R, Ctrl-S          |   Search history.
+F4                      |   Search history with current input.
+F1                      |   Show search help when in search mode.
+F2                      |   Show history.
+F3                      |   Clear history (need confirm).
 
   **Control Commands**
 
-Shortcut                    | Action
-------------------------    | --------------------------------
-    Enter,  Ctrl-J, Ctrl-M  |   EOL and accept line.
-    Ctrl-C, Ctrl-G          |   EOF and abort line.
-    Ctrl-D                  |   EOF if line is empty.
-    Alt-R                   |   Revert line. Undo all changes made to this line.
-    Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
+Shortcut                | Action
+---------               | ------
+Enter,  Ctrl-J, Ctrl-M  |   EOL and accept line.
+Ctrl-C, Ctrl-G          |   EOF and abort line.
+Ctrl-D                  |   EOF if line is empty.
+Alt-R                   |   Revert line. Undo all changes made to this line.
+Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 
   **Notes**
 * For Windows and xterm, almost all shortcuts are supported.
