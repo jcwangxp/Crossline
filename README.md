@@ -1,5 +1,4 @@
-Crossline
-=========
+# Crossline
 **Crossline** is a small, self-contained, zero-config, MIT licensed, cross-platform, readline and libedit replacement.
 
 When should you use Crossline:
@@ -8,8 +7,22 @@ When should you use Crossline:
 * When you need a customized readline: easy to extend.
 * When you need a small readline to build into program.
 
-Features and Highlights
------------------------
+## Catalogue
+* [Features and Highlights](#features-and-highlights)
+* [Background](#background)
+* [Shortcuts](#shortcuts)
+* [History Search](#history-search)
+* [Keyboard Debug](#keyboard-debug)
+* [Embedded Help](#embedded-help)
+* [Extend Crossline](#extend-crossline)
+* [Customized Config](#customized-config)
+* [Crossline APIs](#crossline-apis)
+* [Simple Example](#simple-example)
+* [SQL Parser Example](#sql-parser-example)
+* [Build and Test](#build-and-test)
+* [Related Projects](#related-projects)
+
+## Features and Highlights
 * Support Windows, Linux, vt100 and xterm.
 * Support total `79 shortcuts` and `37 functions`.
 * Support most readline shortcuts (Emacs Standard bindings): fast move, edit, cut&paste, complete, history, control.
@@ -29,17 +42,14 @@ Features and Highlights
 * Easy to customize your own shortcuts and new features.
 * Unicode is to be supported later.
 
-Background
-----------
+## Background
 I'm developing a cross-platfrom command line tool which can support autocomplete and history. **Readline** library is the first choice, but it can't use on Windows directly and you need to link the readline library explicitly. You also need to install the libreadline-dev package to build and if target machine version mismatches with build machine, the program can't run. The libreadline has over 30K LOC and has two so files: libreadline.so libhistory.so, and it depends on libncurses also.
 
 Then I searched and found there's a small readline replacement **linenoise** written by Redis's author. Linenoise is used in Redis, MongoDB, and Android. It's very small (about 1,100 LOC), but it can only run on Linux and supports few shortcuts and features. Then I found there's a more powerful library **linenoise-ng** used in ArangoDB. It's based on MongoDB's linenoise which enhanced original linenoise to support Windows, more shortcuts, features and Unicode. But the code is embedded in MongoDB source code, then ArangoDB ported it out, did some improvements and made it an independent library.
 
 At first I planned to use linenoise-ng, but I found it's still big (about 4,300 LOC) and complex. It uses C++ and C together, and C/C++ dynamic memory is used also which is there in original linenoise. I think it can be much simpler, then I did some prototype verification, and use a different method to implement this brand new, simple, pure C cross-platform enhanced readline replacement library.
 
-Shortcuts
----------
-
+## Shortcuts
 **Misc Commands**
 
 Shortcut                | Action
@@ -130,8 +140,7 @@ Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 * SecureCRT vt100 doesn't support: `Home`, `End`, `Del`, `Insert`, `PgUp`, `PgDn`.
 * SecureCRT xterm doesn't support: `Ctrl-Home`, `Alt-Home`, `Ctrl-End`, `Alt-End`, `Alt-Del`, `Ctrl-Del`, `Clt-Backspace`.
 
-History Search
---------------
+## History Search
 Original readline supports incremental search(`Ctrl-R`,`Ctrl-S`) and none-incremental search(`Alt-N`,`Alt-P`). I tried both and think they're not convenient or efficient to use, so I implemented a brand new interactive search method.
 
 **Enter interactive history search mode**
@@ -192,8 +201,7 @@ Patterns are separated by `' '`, patter match is `case insensitive`.
     Input history id: 1
     SQL> SELECT from student
 
-Keyboard Debug
---------------
+## Keyboard Debug
 **Enter keyboard debug mode**
 Press `Ctrl-^` to enter keyboard debug mode, then you can type any key or composite key, and the code sequence will be displaced. This can be used to discover new key code sequences or debug especially for Linux system with different terminals.
 Note: For Windows, `Alt` key is a state, so it's not displayed.
@@ -213,9 +221,7 @@ Press `Ctrl-C` to exit.
      91 0x5b ([)
      72 0x48 (H)
 
-Embedded Help
--------------
-
+## Embedded Help
 **Edit mode**
 
     SQL> <F1>
@@ -246,8 +252,7 @@ Embedded Help
              choose line including "select from" and 'where'
              and excluding "order by" or 'limit'
 
-Extend Crossline
-----------------
+## Extend Crossline
 You can extend crossline to add new shortcuts and action easily.
 
 **Use keyboard debug mode to find the key code sequences**
@@ -271,8 +276,7 @@ Please add case and action code in `crossline_readline_input`.
 You can refer existing case of similar action to write your new action.
 Use `crossline_refreash` to print line after updating buf.
 
-Customized Config
------------------
+## Customized Config
 **Word delimiters for move and cut**
 Default is defined by `CROSS_DFT_DELIMITER`.
 ```c
@@ -296,8 +300,7 @@ The history line len can be less than user buf len, and it'll cut to history lin
 #define CROSS_COMPLET_HINT_LEN        128        // Completion syntax hints length
 ```
 
-Crossline APIs
---------------
+## Crossline APIs
 ```c
 // Main API to read a line, return buf if get line, return NULL if EOF.
 char* crossline_readline (char *buf, int size, const char *prompt);
@@ -319,8 +322,7 @@ void  crossline_completion_add (crossline_completions_t *pCompletions, const cha
 void  crossline_hints_set (crossline_completions_t *pCompletions, const char *hints);
 ```
 
-Simple Example
---------------
+## Simple Example
 example.c
 ```c
 static void completion_hook (char const *buf, crossline_completions_t *pCompletion)
@@ -352,8 +354,7 @@ int main ()
 }
 ```
 
-SQL Parser Example
-------------------
+## SQL Parser Example
 example_sql.c
 This example implements a simple SQL syntax parser with following syntax format, please read code for details.
 ```sql
@@ -388,8 +389,7 @@ You can use this example to practice the shortcuts above.
      SQL> create index <TAB> // show autocomplete hints
      Please input: index name
 
-Build and Test
---------------
+## Build and Test
 On Windows, you can add the source code to a Visual Studio project to build or enter `Tools Command Prompt for VS` from menu to build in command line which is more efficient.
 
 **Windows MSVC**
@@ -412,8 +412,7 @@ On Windows, you can add the source code to a Visual Studio project to build or e
     gcc -Wall crossline.c example.c -o example
     gcc -Wall crossline.c example_sql.c -o example_sql
 
-Related Projects
-----------------
+## Related Projects
 * [Linenoise](https://github.com/antirez/linenoise) a small self-contained alternative to readline and libedit
 * [Linenoise-ng](https://github.com/arangodb/linenoise-ng) is a fork of Linenoise that aims to add more advanced features like UTF-8 support, Windows support and other features. Uses C++ instead of C as development language.
 
