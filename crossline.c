@@ -271,7 +271,7 @@ static char* s_crossline_help[] = {
 " | Enter,  Ctrl-J, Ctrl-M  |  EOL and accept line.                            |",
 " | Ctrl-C, Ctrl-G          |  EOF and abort line.                             |",
 " | Ctrl-D                  |  EOF if line is empty.                           |",
-" | Alt-R					|  Revert line.                                    |",
+" | Alt-R                   |  Revert line.                                    |",
 " | Ctrl-Z                  |  Suspend Job. (Linux Only, fg will resume edit)  |",
 " +-------------------------+--------------------------------------------------+",
 " Note: If Alt-key doesn't work, an alternate way is to press ESC first then press key, see above ESC+Key.",
