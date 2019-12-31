@@ -281,6 +281,7 @@ NULL};
 
 static char* s_search_help[] = {
 "Patterns are separated by ' ', patter match is case insensitive:",
+"  (Hint: use Ctrl-Y/Ctrl-V/Insert to paste last paterns)",
 "    select:   choose line including 'select'",
 "    -select:  choose line excluding 'select'",
 "    \"select from\":  choose line including \"select from\"",
@@ -465,7 +466,7 @@ static void crossline_show_help (int show_search)
  	printf (" \b\n");
 	for (i = 0; NULL != help[i]; ++i) {
 		printf ("%s\n", help[i]);
-		if (crossline_paging_check ((int)strlen(help[i]))+1)
+		if (crossline_paging_check ((int)strlen(help[i])+1))
 			{ break; }
 	}
 }
