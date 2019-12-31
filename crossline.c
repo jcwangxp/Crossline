@@ -1,6 +1,6 @@
 /* crossline.c -- Version 1.0
  *
- * Crossline is a small, self-contained, zero-config, MIT licensed, 
+ * Crossline is a small, self-contained, zero-config, MIT licensed,
  *   cross-platform, readline and libedit replacement.
  *
  * Press <F1> to get full shortcuts list.
@@ -12,19 +12,19 @@
  * ------------------------------------------------------------------------
  *
  * MIT License
- * 
+ *
  * Copyright (c) 2019, JC Wang (wang_junchuan@163.com)
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -51,6 +51,7 @@
   #endif
 	#define isatty					_isatty
 	#define strcasecmp				_stricmp
+	#define strncasecmp				_strnicmp
 #else
 	#include <unistd.h>
 	#include <termios.h>
@@ -70,7 +71,7 @@
 #define CROSS_HISTORY_BUF_LEN		1024	// History line length
 #define CROSS_HIS_MATCH_PAT_NUM		16		// History search pattern number
 
-#define CROSS_COMPLET_MAX_LINE		256		// Maximum completion word number
+#define CROSS_COMPLET_MAX_LINE		512		// Maximum completion word number
 #define CROSS_COMPLET_WORD_LEN		64		// Completion word length
 #define CROSS_COMPLET_HELP_LEN		128		// Completion word's help length
 #define CROSS_COMPLET_HINT_LEN		128		// Completion syntax hints length
@@ -195,6 +196,7 @@ static char 	s_history_buf[CROSS_HISTORY_MAX_LINE][CROSS_HISTORY_BUF_LEN];
 static uint32_t s_history_id = 0; // Increase always, wrap until UINT_MAX
 static char 	s_clip_buf[CROSS_HISTORY_BUF_LEN]; // Buf to store cut text
 static crossline_completion_callback s_completion_callback = NULL;
+static int		s_paging_print_line = 0; // For paging control
 
 static char* 	crossline_readline_input (char *buf, int size, const char *prompt, int has_input, int in_his);
 static int		crossline_history_dump (FILE *file, int print_id, char *patterns, int sel_id, int paging);
@@ -408,9 +410,7 @@ void crossline_hints_set (crossline_completions_t *pCompletions, const char *hin
 	}
 }
 
-/*****************************************************************************/
-
-static void crossline_screen_get (int *rows, int *cols)
+void crossline_screen_get (int *rows, int *cols)
 {
 #ifdef _WIN32
 	CONSOLE_SCREEN_BUFFER_INFO inf;
@@ -427,36 +427,45 @@ static void crossline_screen_get (int *rows, int *cols)
 	*rows = *rows > 1 ? *rows : 24;
 }
 
-// Paging control for print.
-static int crossline_print_paging (int *print_line, int line_len)
+void crossline_paging_reset (void)
+{
+	s_paging_print_line = 0;
+}
+
+int crossline_paging_check (int line_len)
 {
 	char *paging_hints = "*** Press <Space> or <Enter> to continue . . .";
 	int	i, ch, rows, cols, len = (int)strlen(paging_hints);
 
+	if (!isatty(STDIN_FILENO))	{ return 0; }
 	crossline_screen_get (&rows, &cols);
-	*print_line = *print_line + (line_len + cols - 1) / cols;
-	if (*print_line >= (rows - 1)) {
+	s_paging_print_line += (line_len + cols - 1) / cols;
+	if (s_paging_print_line >= (rows - 1)) {
 		printf ("%s", paging_hints);
 		ch = crossline_getch();
 		// clear paging hints
 		for (i = 0; i < len; ++i) { printf ("\b"); }
 		for (i = 0; i < len; ++i) { printf (" ");  }
 		for (i = 0; i < len; ++i) { printf ("\b"); }
+		s_paging_print_line = 0;
 		if ((' ' != ch) && (KEY_ENTER != ch) && (KEY_ENTER2 != ch))
 			{ return 1; }
-		*print_line = 0;
 	}
 	return 0;
 }
 
+
+/*****************************************************************************/
+
 static void crossline_show_help (int show_search)
 {
-	int	print_line = 0, i;
+	int	i;
 	char **help = show_search ? s_search_help : s_crossline_help;
+	crossline_paging_reset ();
  	printf (" \b\n");
 	for (i = 0; NULL != help[i]; ++i) {
 		printf ("%s\n", help[i]);
-		if (crossline_print_paging (&print_line, (int)strlen(help[i])))
+		if (crossline_paging_check ((int)strlen(help[i]))+1)
 			{ break; }
 	}
 }
@@ -520,9 +529,10 @@ static int crossline_split_patterns (char *patterns, char *pat_list[], int max)
 static int crossline_history_dump (FILE *file, int print_id, char *patterns, int sel_id, int paging)
 {
 	uint32_t i;
-	int		print_line = 0, id = 0, num=0;
+	int		id = 0, num=0;
 	char	*pat_list[CROSS_HIS_MATCH_PAT_NUM], *history;
 
+	crossline_paging_reset ();
 	num = crossline_split_patterns (patterns, pat_list, CROSS_HIS_MATCH_PAT_NUM);
 	for (i = s_history_id; i < s_history_id + CROSS_HISTORY_MAX_LINE; ++i) {
 		history = s_history_buf[i % CROSS_HISTORY_MAX_LINE];
@@ -530,14 +540,14 @@ static int crossline_history_dump (FILE *file, int print_id, char *patterns, int
 			if ((NULL != patterns) && !crossline_match_patterns (history, pat_list, num))
 				{ continue; }
 			if (sel_id > 0) {
-				if (++id == sel_id) 
+				if (++id == sel_id)
 					{ return (i % CROSS_HISTORY_MAX_LINE) + 1; }
 				continue;
 			}
 			if (print_id)	{ fprintf (file, "%4d  %s\n", ++id, history); }
 			else			{ fprintf (file, "%s\n", history); }
 			if (paging) {
-				if (crossline_print_paging (&print_line, (int)strlen(history)+(print_id?6:0)))
+				if (crossline_paging_check ((int)strlen(history)+(print_id?7:1)))
 					{ break; }
 			}
 		}
@@ -567,9 +577,9 @@ static int crossline_history_search (char *input)
 	if (NULL == crossline_readline_input (buf, sizeof (buf), "Input history id: ", (1==count), 1))
 		{ return 0; }
 	his_id = atoi (buf);
-	if (('\0' != buf[0]) && ((his_id > count) || (his_id <= 0))) { 
+	if (('\0' != buf[0]) && ((his_id > count) || (his_id <= 0))) {
 		printf ("Invalid history id: %s\n", buf);
-		return 0; 
+		return 0;
 	}
 	return crossline_history_dump (stdout, 1, pattern, his_id, 0);
 }
@@ -577,8 +587,9 @@ static int crossline_history_search (char *input)
 // Show completions returned by callback.
 static int crossline_show_completions (crossline_completions_t *pCompletions)
 {
-	int i, j, ret = 0, print_line = 0, word_len = 0, with_help = 0, rows, cols, word_num;
+	int i, j, ret = 0, word_len = 0, with_help = 0, rows, cols, word_num;
 
+	crossline_paging_reset ();
 	if (('\0' != pCompletions->hints[0]) || (pCompletions->num > 0)) {
 		printf (" \b\n");
 		ret = 1;
@@ -599,7 +610,7 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 			for (j = 0; j < 4+word_len-(int)strlen(pCompletions->word[i]); ++j)
 				{ printf (" "); }
 			printf ("%s\n", pCompletions->help[i]);
-			if (crossline_print_paging(&print_line, (int)strlen(pCompletions->help[i])+4+word_len))
+			if (crossline_paging_check((int)strlen(pCompletions->help[i])+4+word_len+1))
 				{ break; }
 		}
 		return ret;
@@ -607,20 +618,19 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 
 	// Print words list in multiple columns.
 	crossline_screen_get (&rows, &cols);
-	word_num = (cols + 4) / (word_len + 4);
-	word_num = word_num > 0 ? word_num : 1;
-	for (i = 0; i < pCompletions->num; ++i) {
-		if ((i > 0) && (0 == (i % word_num))) {
+	word_num = (cols - 1 - word_len) / (word_len + 4) + 1;
+	for (i = 1; i <= pCompletions->num; ++i) {
+		printf ("%s", pCompletions->word[i-1]);
+		for (j = 0; j < ((i%word_num)?4:0)+word_len-(int)strlen(pCompletions->word[i-1]); ++j)
+			{ printf (" "); }
+		if (0 == (i % word_num)) {
 			printf ("\n");
-			if (crossline_print_paging(&print_line, word_len))
+			if (crossline_paging_check (word_len))
 				{ return ret; }
 		}
-		printf ("%s", pCompletions->word[i]);
-		for (j = 0; j < 2+word_len-(int)strlen(pCompletions->word[i]); ++j)
-			{ printf (" "); }
 	}
 
-	printf ("\n");
+	if (pCompletions->num % word_num) { printf ("\n"); }
 	return ret;
 }
 
@@ -793,7 +803,7 @@ static int crossline_getkey (int *is_esc)
 static char* crossline_readline_input (char *buf, int size, const char *prompt, int has_input, int in_his)
 {
 	int		pos = 0, num = 0, read_end = 0, is_esc;
-	int		ch, len, new_pos, copy_buf = 0;
+	int		ch, len, new_pos, copy_buf = 0, i, len2;
 	uint32_t history_id = s_history_id, search_his;
 	char	input[CROSS_HISTORY_BUF_LEN];
 	crossline_completions_t		completions;
@@ -832,7 +842,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 /* Move Commands */
 		case KEY_LEFT:	// Move back a character.
 		case CTRL_KEY('B'):
-			if (pos > 0) 
+			if (pos > 0)
 				{ crossline_refreash (buf, &pos, &num, pos-1, num); }
 			break;
 
@@ -1021,13 +1031,25 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			completions.num = 0;
 			completions.hints[0] = '\0';
 			s_completion_callback (buf, &completions);
-			if ((1 == completions.num) && (KEY_TAB == ch)) {
-				for (new_pos=pos; new_pos > 0 && !isdelim(buf[new_pos-1]); --new_pos)	;
-				snprintf (&buf[new_pos], size - new_pos, "%s " , completions.word[0]);
-				buf[size-1] = '\0';
-				len = (int)strlen(completions.word[0]) + 1;
-				crossline_refreash (buf, &pos, &num, new_pos+len, new_pos+len);
-			} else if (crossline_show_completions(&completions))
+			if (completions.num >= 1) {
+				if (KEY_TAB == ch) {
+					len2 = len = (int)strlen(completions.word[0]);
+					// Find common string for autocompletion
+					for (i = 1; (i < completions.num) && (len > 0); ++i) {
+						while ((len > 0) && strncasecmp(completions.word[0], completions.word[i], len)) { len--; }
+					}
+					if (len > 0) {
+						while ((len2 > 0) && strncasecmp(completions.word[0], &buf[num-len2], len2)) { len2--; }
+						new_pos = num - len2;
+						if (new_pos+i+1 < size) {
+							for (i = 0; i < len; ++i) { buf[new_pos+i] = completions.word[0][i]; }
+							if (1 == completions.num) { buf[new_pos + (i++)] = ' '; }
+							crossline_refreash (buf, &pos, &num, new_pos+i, new_pos+i);
+						}
+					}
+				}
+			}
+			if (((completions.num != 1) || (KEY_TAB != ch)) && crossline_show_completions(&completions))
 				{ printf ("%s%s", prompt, buf); }
 			break;
 
@@ -1070,7 +1092,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case ALT_KEY('>'):	// Move to end of input history.
 		case KEY_PGDN:
 			if (in_his) { break; }
-			if (!copy_buf)	
+			if (!copy_buf)
 				{ crossline_text_copy (input, buf, 0, num); copy_buf = 1; }
 			history_id = s_history_id;
 			strncpy (buf, input, size-1);
@@ -1084,7 +1106,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			if (in_his) { break; }
 			crossline_text_copy (input, buf, 0, num);
 			search_his = crossline_history_search ((KEY_F4 == ch) ? buf : NULL);
-			if (search_his > 0)	
+			if (search_his > 0)
 				{ strncpy (buf, s_history_buf[search_his-1], size-1); }
 			else { strncpy (buf, input, size-1); }
 			buf[size-1] = '\0';

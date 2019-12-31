@@ -24,7 +24,7 @@ gcc -Wall crossline.c example.c -o example
 static void completion_hook (char const *buf, crossline_completions_t *pCompletion)
 {
 	int i;
-	static const char *cmd[] = {"insert", "select", "update", "delete", "create", "drop", "show", "describe", "help", "exit", "history", NULL};
+	static const char *cmd[] = {"insert", "select", "update", "delete", "create", "drop", "show", "describe", "help", "exit", "history", "paging", NULL};
 
 	for (i = 0; NULL != cmd[i]; ++i) {
 		if (0 == strncmp(buf, cmd[i], strlen(buf))) {
@@ -32,6 +32,18 @@ static void completion_hook (char const *buf, crossline_completions_t *pCompleti
 		}
 	}
 
+}
+
+static void pagint_test ()
+{
+	int i;
+	crossline_paging_reset ();
+	for (i = 0; i < 256; ++i) {
+		printf ("Paging test: %3d\n", i);
+		if (crossline_paging_check (sizeof("paging test: ") + 3)) {
+			break;
+		}
+	}
 }
 
 int main ()
@@ -43,6 +55,9 @@ int main ()
 
 	while (NULL != crossline_readline (buf, sizeof(buf), "Crossline> ")) {
 		printf ("Read line: \"%s\"\n", buf);
+		if (!strcmp (buf, "paging")) {
+			pagint_test ();
+		}
 	}	
 
 	crossline_history_save ("history.txt");

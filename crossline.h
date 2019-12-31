@@ -48,10 +48,14 @@ extern char* crossline_readline (char *buf, int size, const char *prompt);
 // Set move/cut word delimiter, default is all not digital and alphabetic characters.
 extern void  crossline_delimiter_set (const char *delim);
 
-// History APIs
+/* History APIs */
+// Save history to file
 extern int   crossline_history_save (const char *filename);
+// Load history from file
 extern int   crossline_history_load (const char *filename);
+// Show history in buffer
 extern void  crossline_history_show (void);
+// Clear history
 extern void  crossline_history_clear (void);
 
 /* Completion APIs */
@@ -61,6 +65,15 @@ extern void  crossline_completion_register (crossline_completion_callback pCbFun
 extern void  crossline_completion_add (crossline_completions_t *pCompletions, const char *word, const char *help);
 // Set syntax hints in callback
 extern void  crossline_hints_set (crossline_completions_t *pCompletions, const char *hints);
+
+/* Paging APIs */
+// Get screen rows and columns
+extern void crossline_screen_get (int *rows, int *cols);
+// Reset paging before starting paing control
+extern void crossline_paging_reset (void);
+// Check paging after print a line, return 1 means quit, 0 means continue
+// if you know only one line is printed, just give print_line = 1
+extern int  crossline_paging_check (int print_line);
 
 #ifdef __cplusplus
 }

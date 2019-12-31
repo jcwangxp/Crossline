@@ -1,4 +1,5 @@
 # Crossline
+
 **Crossline** is a small, self-contained, zero-config, MIT licensed, cross-platform, readline and libedit replacement.
 
 When should you use Crossline:
@@ -7,22 +8,27 @@ When should you use Crossline:
 * When you need a customized readline: easy to extend.
 * When you need a small readline to build into program.
 
+
 ## Catalogue
-* [Features and Highlights](#features-and-highlights)
-* [Background](#background)
-* [Shortcuts](#shortcuts)
-* [History Search](#history-search)
-* [Keyboard Debug](#keyboard-debug)
-* [Embedded Help](#embedded-help)
-* [Extend Crossline](#extend-crossline)
-* [Customized Config](#customized-config)
-* [Crossline APIs](#crossline-apis)
-* [Simple Example](#simple-example)
-* [SQL Parser Example](#sql-parser-example)
-* [Build and Test](#build-and-test)
-* [Related Projects](#related-projects)
+
+* [Features and Highlights](#Features-and-Highlights)
+* [Background](#Background)
+* [Shortcuts](#Shortcuts)
+* [History Search](#History-Search)
+* [Keyboard Debug](#Keyboard-Debug)
+* [Embedded Help](#Embedded-Help)
+* [Extend Crossline](#Extend-Crossline)
+* [Customized Config](#Customized-Config)
+* [Crossline APIs](#Crossline-APIs)
+* [Paging APIs Example](#Paging-APIs-Example)
+* [Simple Example](#Simple-Example)
+* [SQL Parser Example](#SQL-Parser-Example)
+* [Build and Test](#build-and-Test)
+* [Related Projects](#Related-Projects)
+
 
 ## Features and Highlights
+
 * Support Windows, Linux, vt100 and xterm.
 * Support total `79 shortcuts` and `37 functions`.
 * Support most readline shortcuts (Emacs Standard bindings): move, edit, cut&paste, complete, history, control.
@@ -32,6 +38,7 @@ When should you use Crossline:
 * Support powerful interactive history search with multiple case insensitive including and excluding match patterns.
 * Support same edit shortcuts (except complete and history shortcuts) in history search mode.
 * Support autocomplete, history show/search, help info paging with auto resizing.
+* Support common APIs for paing control.
 * Support convenient embedded `F1` help in edit and history search mode, and you can call it anytime without losing current input.
 * Support convenient embedded `Ctrl-^` keyboard debug mode to watch key code sequences.
 * Support `Ctrl-C` to exit edit and `Ctrl-Z` to suspend and resume job(Linux) in both edit and search mode.
@@ -43,6 +50,7 @@ When should you use Crossline:
 * Unicode is to be supported later.
 
 ## Background
+
 I'm developing a cross-platfrom command line tool which can support autocomplete and history. **Readline** library is the first choice, but it can't use on Windows directly and you need to link the readline library explicitly. You also need to install the libreadline-dev package to build and if target machine version mismatches with build machine, the program can't run. The libreadline has over 30K LOC and has two so files: libreadline.so libhistory.so, and it depends on libncurses also.
 
 Then I searched and found there's a small readline replacement **linenoise** written by Redis's author. Linenoise is used in Redis, MongoDB, and Android. It's very small (about 1,100 LOC), but it can only run on Linux and supports few shortcuts and features. Then I found there's a more powerful library **linenoise-ng** used in ArangoDB. It's based on MongoDB's linenoise which enhanced original linenoise to support Windows, more shortcuts, features and Unicode. But the code is embedded in MongoDB source code, then ArangoDB ported it out, did some improvements and made it an independent library.
@@ -50,6 +58,7 @@ Then I searched and found there's a small readline replacement **linenoise** wri
 At first I planned to use linenoise-ng, but I found it's still big (about 4,300 LOC) and complex. It uses C++ and C together, and C/C++ dynamic memory is used also which is there in original linenoise. I think it can be much simpler, then I did some prototype verification, and use a different method to implement this brand new, simple, pure C cross-platform enhanced readline replacement library.
 
 ## Shortcuts
+
 **Misc Commands**
 
 Shortcut                | Action
@@ -93,14 +102,14 @@ Alt-D, ESC+Del, Alt-Del, Ctrl-Del        | Cut word following cursor. (Alt-Del,C
 Ctrl-W                  |   Cut to left till whitespace (not word).
 Ctrl-Y, Ctrl-V, Insert  |   Paste last cut text.
 
-  **Complete Commands**
+**Complete Commands**
 
 Shortcut                | Action
 ---------               | ------
 TAB, Ctrl-I             |   Autocomplete.
 Alt-=, Alt-?            |   List possible completions.
 
-  **History Commands**
+**History Commands**
 
 Shortcut                | Action
 ---------               | ------
@@ -114,7 +123,7 @@ F1                      |   Show search help when in search mode.
 F2                      |   Show history.
 F3                      |   Clear history (need confirm).
 
-  **Control Commands**
+**Control Commands**
 
 Shortcut                | Action
 ---------               | ------
@@ -124,7 +133,8 @@ Ctrl-D                  |   EOF if line is empty.
 Alt-R                   |   Revert line. Undo all changes made to this line.
 Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 
-  **Notes**
+**Notes**
+
 * For Windows and xterm, almost all shortcuts are supported.
 * For some terminal tools you need to enable Alt as meta key.
   SecureCRT: check `Terminal->Emulation->Emacs->use ALT as meta key`
@@ -135,28 +145,37 @@ Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 * `Ctrl+S` is readline shortcut to search history also, but it'll halt terminal, so don't use it with Linux system, use `Ctrl+Q` to exit freezing state if pressing by mistake.
 
 **Terminal Limitations**
+
 * Some terminals only support `left Alt`.
 * Linux console doesn't support: `Alt-?`, `Alt-<`, `Alt->`.
 * SecureCRT vt100 doesn't support: `Home`, `End`, `Del`, `Insert`, `PgUp`, `PgDn`.
 * SecureCRT xterm doesn't support: `Ctrl-Home`, `Alt-Home`, `Ctrl-End`, `Alt-End`, `Alt-Del`, `Ctrl-Del`, `Clt-Backspace`.
 
+[Goto Top](#Catalogue)
+
+
 ## History Search
+
 Original readline supports incremental search(`Ctrl-R`,`Ctrl-S`) and none-incremental search(`Alt-N`,`Alt-P`). I tried both and think they're not convenient or efficient to use, so I implemented a brand new interactive search method.
 
 **Enter interactive history search mode**
+
 * `Ctrl-R`: Search history.
 * `F4`: Search history with current input as search patterns.
 
 **Exit interactive history search mode**
+
 * `Ctrl-C`: You can exit search mode anytime and keep your original input.
 * `Ctrl-D`: On empty line only.
 
 **Input patterns**
+
 * You can use all edit shortcuts except complete and history shortcuts.
 * You can use `Insert`,`Ctrl-Y`,`Ctrl-S` to paste last search patterns.
 * If nothing input will show all history (`F2` can show history too).
 
 **Patterns syntax**
+
 You can press `F1` to get help.
 Patterns are separated by `' '`, patter match is `case insensitive`.
 * `select`:   choose line including `select`
@@ -166,6 +185,7 @@ Patterns are separated by `' '`, patter match is `case insensitive`.
 * `"select from" where -"order by" -limit` : choose line including `select from` and `where` and excluding `order by` or `limit`
 
 **Select history**
+
 * If only one history is found, id `1` is provided automatically, and you just press `Enter` to select.
 * You can press `Ctrl-C` to skip choosing.
 * You can press `Enter` or `Ctrl-D` on empty line to skip choosing.
@@ -204,12 +224,18 @@ Patterns are separated by `' '`, patter match is `case insensitive`.
     Input history id: 1
     SQL> SELECT from student
 
+[Goto Top](#Catalogue)
+
+
 ## Keyboard Debug
+
 **Enter keyboard debug mode**
+
 Press `Ctrl-^` to enter keyboard debug mode, then you can type any key or composite key, and the code sequence will be displaced. This can be used to discover new key code sequences or debug especially for Linux system with different terminals.
 Note: For Windows, `Alt` key is a state, so it's not displayed.
 
 **Exit keyboard debug mode**
+
 Press `Ctrl-C` to exit.
 
 **Example**
@@ -224,7 +250,9 @@ Press `Ctrl-C` to exit.
      91 0x5b ([)
      72 0x48 (H)
 
+
 ## Embedded Help
+
 **Edit mode**
 
     SQL> <F1>
@@ -255,32 +283,46 @@ Press `Ctrl-C` to exit.
              choose line including "select from" and 'where'
              and excluding "order by" or 'limit'
 
+[Goto Top](#Catalogue)
+
+
 ## Extend Crossline
+
 You can extend crossline to add new shortcuts and action easily.
 
 **Use keyboard debug mode to find the key code sequences**
+
 * For Windows, most key has only one code, some function key has 2, first is 224 or 0, then follows another code. `Alt` key in Windows is a state, please refer `crossline_getkey`.
 * For Linux system, most function key has an escape sequences(up to 6), and one function key may have many different escape sequences for different terminal modes, so you need to test case by case.
 
 **Define new key**
+
 * For `Ctrl-key`, most are single code, and you can use `CTRL_KEY(key)` directly. 
 * For windows, most `Alt-key` can use `ALT_KEY(num)`.
 * For Linux, most `Alt` key is escape sequences, and you can use existing macro like `ESC_KEY6`, example: `KEY_ALT_LEFT    = ESC_KEY6('1','3','D'), // xterm Esc[1;3D: Move back a word.`
 
 **Support new Esc+key**
+
 Please add the conversion in `crossline_key_esc2alt`
 
 **Map new key to existing action**
+
 * If it's a new different escape sequences for same key, please map the new key to main action key in `crossline_key_mapping`.
 * If it's a new key, please add case to `crossline_readline_input`.
 
 **Add new action**
+
 Please add case and action code in `crossline_readline_input`.
 You can refer existing case of similar action to write your new action.
 Use `crossline_refreash` to print line after updating buf.
 
+[Goto Top](#Catalogue)
+
+
 ## Customized Config
+
 **Word delimiters for move and cut**
+
 Default is defined by `CROSS_DFT_DELIMITER`.
 ```c
 #define CROSS_DFT_DELIMITER            " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
@@ -288,44 +330,111 @@ Default is defined by `CROSS_DFT_DELIMITER`.
 You can modify it or use `crossline_delimiter_set` to change it.
 
 **History**
+
 The history line len can be less than user buf len, and it'll cut to history line len when storing to history buf.
 ```c
-#define CROSS_HISTORY_MAX_LINE        256        // Maximum history line number
+#define CROSS_HISTORY_MAX_LINE       256         // Maximum history line number
 #define CROSS_HISTORY_BUF_LEN        1024        // History line length
-#define CROSS_HIS_MATCH_PAT_NUM        16        // History search pattern number
+#define CROSS_HIS_MATCH_PAT_NUM      16          // History search pattern number
 ```
 
 **Completion**
 ```c
-#define CROSS_COMPLET_MAX_LINE        256        // Maximum completion word number
+#define CROSS_COMPLET_MAX_LINE        512        // Maximum completion word number
 #define CROSS_COMPLET_WORD_LEN        64         // Completion word length
 #define CROSS_COMPLET_HELP_LEN        128        // Completion word's help length
 #define CROSS_COMPLET_HINT_LEN        128        // Completion syntax hints length
 ```
 
+
 ## Crossline APIs
+
 ```c
 // Main API to read a line, return buf if get line, return NULL if EOF.
 char* crossline_readline (char *buf, int size, const char *prompt);
+
 // Set move/cut word delimiter, default is all not digital and alphabetic characters
 void  crossline_delimiter_set (const char *delim);
 
-// History APIs
+
+/* History APIs */
+
+// Save history to file
 int   crossline_history_save (const char *filename);
+
+// Load history from file
 int   crossline_history_load (const char *filename);
+
+// Show history in buffer
 void  crossline_history_show (void);
+
+// Clear history
 void  crossline_history_clear (void);
 
+
 /* Completion APIs */
+
 // Register completion callback
 void  crossline_completion_register (crossline_completion_callback pCbFunc);
+
 // Add completion in callback. Word is must, help for word is optional.
 void  crossline_completion_add (crossline_completions_t *pCompletions, const char *word, const char *help);
+
 // Set syntax hints in callback
 void  crossline_hints_set (crossline_completions_t *pCompletions, const char *hints);
 ```
 
+[Goto Top](#Catalogue)
+
+
+## Paging APIs Example
+
+These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make thme open.
+
+```c
+/* Paging APIs */
+// Get screen rows and columns
+void crossline_screen_get (int *rows, int *cols);
+
+// Reset paging before starting paing control
+void crossline_paging_reset (void);
+
+// Check paging after print a line, return 1 means quit, 0 means continue
+// if you know only one line is printed, just give print_line = 1
+int  crossline_paging_check (int print_line);
+```
+
+example.c
+```c
+static void pagint_test ()
+{
+	int i;
+	crossline_paging_reset ();
+	for (i = 0; i < 256; ++i) {
+		printf ("Paging test: %3d\n", i);
+		if (crossline_paging_check (sizeof("paging test: ") + 3)) {
+			break;
+		}
+	}
+}
+```
+
+It'll work as following:
+
+	Crossline> paging
+	Read line: "paging"
+	Paging test:   0
+	Paging test:   1
+	Paging test:   2
+	Paging test:   3
+	Paging test:   4
+	Paging test:   5
+	Paging test:   6
+	*** Press <Space> or <Enter> to continue . . .
+
+
 ## Simple Example
+
 example.c
 ```c
 static void completion_hook (char const *buf, crossline_completions_t *pCompletion)
@@ -382,7 +491,7 @@ You can use this example to practice the shortcuts above.
     drop        Drop index or table
     show        Show tables or databases
     describe    Show table schema
-    help        Show help for topic
+    help        Show help for Topic
     exit        Exit shell
     history     Show history
      *** Press <Space> or <Enter> to continue . . .
@@ -394,7 +503,11 @@ You can use this example to practice the shortcuts above.
     SQL> create index <TAB> // show autocomplete hints
     Please input: index name
 
+[Goto Top](#Catalogue)
+
+
 ## Build and Test
+
 On Windows, you can add the source code to a Visual Studio project to build or enter `Tools Command Prompt for VS` from menu to build in command line which is more efficient.
 
 **Windows MSVC**
@@ -406,20 +519,20 @@ On Windows, you can add the source code to a Visual Studio project to build or e
 
     clang -D_CRT_SECURE_NO_WARNINGS -Wall -lUser32 crossline.c example.c -o example.exe
     clang -D_CRT_SECURE_NO_WARNINGS -Wall -lUser32 crossline.c example_sql.c -o example_sql.exe
-
-**Linux Clang**
-
-    clang -Wall crossline.c example.c -o example
-    clang -Wall crossline.c example_sql.c -o example_sql
     
 **GCC(Linux, MinGW, Cygwin, MSYS2)**
 
     gcc -Wall crossline.c example.c -o example
     gcc -Wall crossline.c example_sql.c -o example_sql
 
+**Linux Clang**
+
+    clang -Wall crossline.c example.c -o example
+    clang -Wall crossline.c example_sql.c -o example_sql
+
 ## Related Projects
+
 * [Linenoise](https://github.com/antirez/linenoise) a small self-contained alternative to readline and libedit
 * [Linenoise-ng](https://github.com/arangodb/linenoise-ng) is a fork of Linenoise that aims to add more advanced features like UTF-8 support, Windows support and other features. Uses C++ instead of C as development language.
 
-Thanks
--JC
+[Goto Top](#Catalogue)
