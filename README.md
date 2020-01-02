@@ -47,7 +47,8 @@ When should you use Crossline:
 * No any dynamic memory operations: malloc/free/realloc/new/delete/strdup/etc.
 * Very small only about 1000 LOC, and code logic is simple and easy to read.
 * Easy to customize your own shortcuts and new features.
-* Unicode is to be supported later.
+* Only single line edit mode is supported now.
+* Unicode is not supported yet.
 
 ## Background
 
@@ -351,7 +352,7 @@ The history line len can be less than user buf len, and it'll cut to history lin
 
 ```c
 // Main API to read a line, return buf if get line, return NULL if EOF.
-char* crossline_readline (char *buf, int size, const char *prompt);
+char* crossline_readline (const char *prompt, char *buf, int size);
 
 // Set move/cut word delimiter, default is all not digital and alphabetic characters
 void  crossline_delimiter_set (const char *delim);
@@ -457,7 +458,7 @@ int main ()
     crossline_completion_register (completion_hook);
     crossline_history_load ("history.txt");
 
-    while (NULL != crossline_readline (buf, sizeof(buf), "Crossline> ")) {
+    while (NULL != crossline_readline ("Crossline> ", buf, sizeof(buf))) {
         printf ("Read line: \"%s\"\n", buf);
     }    
 
@@ -467,8 +468,11 @@ int main ()
 ```
 
 ## SQL Parser Example
+
 example_sql.c
+
 This example implements a simple SQL syntax parser with following syntax format, please read code for details.
+
 ```sql
 insert into <table> set column1=value1,column2=value2,...
 select <* | column1,columnm2,...> from <table> [where] [order by] [limit] [offset]

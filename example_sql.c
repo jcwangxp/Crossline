@@ -214,7 +214,7 @@ int main ()
 	crossline_completion_register (sql_completion_hook);
 	crossline_history_load ("history.txt");
 
-	while (NULL != crossline_readline (buf, sizeof(buf), "SQL> ")) {
+	while (NULL != crossline_readline ("SQL> ", buf, sizeof(buf))) {
 		printf ("Read line: \"%s\"\n", buf);
 		if (!strcmp (buf, "history")) {
 			crossline_history_show ();

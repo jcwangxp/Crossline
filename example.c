@@ -49,16 +49,16 @@ static void pagint_test ()
 int main ()
 {
 	char buf[256];
-	
+
 	crossline_completion_register (completion_hook);
 	crossline_history_load ("history.txt");
 
-	while (NULL != crossline_readline (buf, sizeof(buf), "Crossline> ")) {
+	while (NULL != crossline_readline ("Crossline> ", buf, sizeof(buf))) {
 		printf ("Read line: \"%s\"\n", buf);
 		if (!strcmp (buf, "paging")) {
 			pagint_test ();
 		}
-	}	
+	}
 
 	crossline_history_save ("history.txt");
 	return 0;
