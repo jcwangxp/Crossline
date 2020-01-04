@@ -52,12 +52,14 @@
 	#define isatty					_isatty
 	#define strcasecmp				_stricmp
 	#define strncasecmp				_strnicmp
+	static int s_crossline_win = 1;
 #else
 	#include <unistd.h>
 	#include <termios.h>
 	#include <fcntl.h>
 	#include <signal.h>
 	#include <sys/ioctl.h>
+	static int s_crossline_win = 0;
 #endif
 
 #include "crossline.h"
@@ -68,12 +70,12 @@
 #define CROSS_DFT_DELIMITER			" !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 
 #define CROSS_HISTORY_MAX_LINE		256		// Maximum history line number
-#define CROSS_HISTORY_BUF_LEN		1024	// History line length
+#define CROSS_HISTORY_BUF_LEN		4096	// History line length
 #define CROSS_HIS_MATCH_PAT_NUM		16		// History search pattern number
 
 #define CROSS_COMPLET_MAX_LINE		512		// Maximum completion word number
 #define CROSS_COMPLET_WORD_LEN		64		// Completion word length
-#define CROSS_COMPLET_HELP_LEN		128		// Completion word's help length
+#define CROSS_COMPLET_HELP_LEN		256		// Completion word's help length
 #define CROSS_COMPLET_HINT_LEN		128		// Completion syntax hints length
 
 // Make control-characters readable
@@ -198,11 +200,23 @@ static char 	s_clip_buf[CROSS_HISTORY_BUF_LEN]; // Buf to store cut text
 static crossline_completion_callback s_completion_callback = NULL;
 static int		s_paging_print_line = 0; // For paging control
 
-static char* 	crossline_readline_input (char *buf, int size, const char *prompt, int has_input, int in_his);
+static char* 	crossline_readline_edit (char *buf, int size, const char *prompt, int has_input, int in_his);
 static int		crossline_history_dump (FILE *file, int print_id, char *patterns, int sel_id, int paging);
-static int 		crossline_getch (void); // Read a character from keyboard
 
 #define isdelim(ch)		(NULL != strchr(s_word_delimiter, ch))	// Check ch is word delimiter
+
+// Debug macro.
+#if 0
+static FILE *s_crossline_debug_fp = NULL;
+#define crossline_debug(...) \
+	do { \
+		if (NULL == s_crossline_debug_fp) { s_crossline_debug_fp = fopen("crossline_debug.txt", "a"); } \
+		fprintf (s_crossline_debug_fp, __VA_ARGS__); \
+		fflush (s_crossline_debug_fp); \
+	} while (0)
+#else
+#define crossline_debug(...)
+#endif
 
 /*****************************************************************************/
 
@@ -216,6 +230,8 @@ static char* s_crossline_help[] = {
 " +-------------------------+--------------------------------------------------+",
 " | Ctrl-B, Left            |  Move back a character.                          |",
 " | Ctrl-F, Right           |  Move forward a character.                       |",
+" | Up                      |  Move cursor to up line. (For multiple lines)    |",
+" | Down                    |  Move cursor to down line. (For multiple lines)  |",
 " | Alt-B, ESC+Left,        |  Move back a word.                               |",
 " |    Ctrl-Left, Alt-Left  |  (Ctrl-Left, Alt-Left only support Windows/Xterm)|",
 " | Alt-F, ESC+Right,       |  Move forward a word.                            |",
@@ -277,6 +293,9 @@ static char* s_crossline_help[] = {
 " | Ctrl-Z                  |  Suspend Job. (Linux Only, fg will resume edit)  |",
 " +-------------------------+--------------------------------------------------+",
 " Note: If Alt-key doesn't work, an alternate way is to press ESC first then press key, see above ESC+Key.",
+" Note: In multiple lines, Up/Down will move between lines.",
+"       Up key will fetch history when cursor in first line or end of last line(for quick history move)",
+"       Down key will fetch history when in last line.",
 NULL};
 
 static char* s_search_help[] = {
@@ -319,7 +338,7 @@ char* crossline_readline (const char *prompt, char *buf, int size)
         return buf;
 	}
 
-	return crossline_readline_input (buf, size, prompt, 0, 0);
+	return crossline_readline_edit (buf, size, prompt, 0, 0);
 }
 
 // Set move/cut word delimiter, defaut is all not digital and alphabetic characters.
@@ -411,27 +430,10 @@ void crossline_hints_set (crossline_completions_t *pCompletions, const char *hin
 	}
 }
 
-void crossline_screen_get (int *rows, int *cols)
-{
-#ifdef _WIN32
-	CONSOLE_SCREEN_BUFFER_INFO inf;
-	GetConsoleScreenBufferInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
-	*cols = inf.srWindow.Right - inf.srWindow.Left + 1;
-	*rows = inf.srWindow.Bottom - inf.srWindow.Top + 1;
-#else
-	struct winsize ws = {};
-	ioctl (1, TIOCGWINSZ, &ws);
-	*cols = ws.ws_col;
-	*rows = ws.ws_row;
-#endif
-	*cols = *cols > 1 ? *cols : 80;
-	*rows = *rows > 1 ? *rows : 24;
-}
+/*****************************************************************************/
 
 void crossline_paging_reset (void)
-{
-	s_paging_print_line = 0;
-}
+{	s_paging_print_line = 0;	}
 
 int crossline_paging_check (int line_len)
 {
@@ -455,6 +457,113 @@ int crossline_paging_check (int line_len)
 	return 0;
 }
 
+/*****************************************************************************/
+
+#ifdef _WIN32	// Windows
+
+int crossline_getch (void)
+{
+	fflush (stdout);
+	return _getch();
+}
+void crossline_screen_get (int *pRows, int *pCols)
+{
+	CONSOLE_SCREEN_BUFFER_INFO inf;
+	GetConsoleScreenBufferInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
+	*pCols = inf.srWindow.Right - inf.srWindow.Left + 1;
+	*pRows = inf.srWindow.Bottom - inf.srWindow.Top + 1;
+	*pCols = *pCols > 1 ? *pCols : 80;
+	*pRows = *pRows > 1 ? *pRows : 24;
+}
+int crossline_cursor_get (int *pRow, int *pCol)
+{
+	CONSOLE_SCREEN_BUFFER_INFO inf;
+	GetConsoleScreenBufferInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
+	*pRow = inf.dwCursorPosition.Y - inf.srWindow.Top;
+	*pCol = inf.dwCursorPosition.X - inf.srWindow.Left;
+	return 0;
+}
+void crossline_cursor_set (int row, int col)
+{
+	CONSOLE_SCREEN_BUFFER_INFO inf;
+	GetConsoleScreenBufferInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
+	inf.dwCursorPosition.Y = (SHORT)row + inf.srWindow.Top;	
+	inf.dwCursorPosition.X = (SHORT)col + inf.srWindow.Left;
+	SetConsoleCursorPosition (GetStdHandle(STD_OUTPUT_HANDLE), inf.dwCursorPosition);
+}
+void crossline_cursor_move (int row_off, int col_off)
+{
+	CONSOLE_SCREEN_BUFFER_INFO inf;
+	GetConsoleScreenBufferInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
+	inf.dwCursorPosition.Y += (SHORT)row_off;
+	inf.dwCursorPosition.X += (SHORT)col_off;
+	SetConsoleCursorPosition (GetStdHandle(STD_OUTPUT_HANDLE), inf.dwCursorPosition);
+}
+void crossline_cursor_hide (int bHide)
+{
+	CONSOLE_CURSOR_INFO inf;
+	GetConsoleCursorInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
+	inf.bVisible = !bHide;
+	SetConsoleCursorInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
+}
+
+#else // Linux
+
+int crossline_getch ()
+{
+	char ch = 0;
+	struct termios old_term, cur_term;
+	fflush (stdout);
+	if (tcgetattr(STDIN_FILENO, &old_term) < 0)	{ perror("tcsetattr"); }
+	cur_term = old_term;
+	cur_term.c_lflag &= ~(ICANON | ECHO | ISIG); // echoing off, canonical off, no signal chars
+	cur_term.c_cc[VMIN] = 1;
+	cur_term.c_cc[VTIME] = 0;
+	if (tcsetattr(STDIN_FILENO, TCSANOW, &cur_term) < 0)	{ perror("tcsetattr"); }
+	if (read(STDIN_FILENO, &ch, 1) < 0)	{ perror("read()"); }
+	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &old_term) < 0)	{ perror("tcsetattr"); }
+	return ch;
+}
+void crossline_screen_get (int *pRows, int *pCols)
+{
+	struct winsize ws = {};
+	ioctl (1, TIOCGWINSZ, &ws);
+	*pCols = ws.ws_col;
+	*pRows = ws.ws_row;
+	*pCols = *pCols > 1 ? *pCols : 80;
+	*pRows = *pRows > 1 ? *pRows : 24;
+}
+int crossline_cursor_get (int *pRow, int *pCol)
+{
+	int i;
+	char buf[32];
+	printf ("\e[6n");
+	for (i = 0; i < (char)sizeof(buf)-1; ++i) {
+		buf[i] = (char)crossline_getch ();
+		if ('R' == buf[i]) { break; }
+	}
+	buf[i] = '\0';
+	if (2 != sscanf (buf, "\e[%d;%dR", pRow, pCol)) { return -1; }
+	(*pRow)--; (*pCol)--;
+	return 0;
+}
+void crossline_cursor_set (int row, int col)
+{
+	printf("\e[%d;%dH", row+1, col+1);
+}
+void crossline_cursor_move (int row_off, int col_off)
+{
+	if (col_off > 0)		{ printf ("\e[%dC", col_off);  }
+	else if (col_off < 0)	{ printf ("\e[%dD", -col_off); }
+	if (row_off > 0)		{ printf ("\e[%dB", row_off);  }
+	else if (row_off < 0)	{ printf ("\e[%dA", -row_off); }
+}
+void crossline_cursor_hide (int bHide)
+{
+	printf("\e[?25%c", bHide?'l':'h');
+}
+
+#endif // #ifdef _WIN32
 
 /*****************************************************************************/
 
@@ -568,14 +677,14 @@ static int crossline_history_search (char *input)
 		pattern[sizeof(pattern) - 1] = '\0';
 	}
 	// Get search patterns
-	if (NULL == crossline_readline_input(pattern, sizeof (pattern), "Input Patterns <F1> help: ", (NULL!=input), 1))
+	if (NULL == crossline_readline_edit(pattern, sizeof (pattern), "Input Patterns <F1> help: ", (NULL!=input), 1))
 		{ return 0; }
 	strncpy (s_clip_buf, pattern, sizeof(s_clip_buf) - 1);
 	s_clip_buf[sizeof(s_clip_buf) - 1] = '\0';
 	count = crossline_history_dump (stdout, 1, pattern, 0, 1);
 	if (0 == count)	{ return 0; } // Nothing found, just return
 	// Get choice
-	if (NULL == crossline_readline_input (buf, sizeof (buf), "Input history id: ", (1==count), 1))
+	if (NULL == crossline_readline_edit (buf, sizeof (buf), "Input history id: ", (1==count), 1))
 		{ return 0; }
 	his_id = atoi (buf);
 	if (('\0' != buf[0]) && ((his_id > count) || (his_id <= 0))) {
@@ -635,33 +744,52 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 	return ret;
 }
 
-// Refreash current print line and move cursor to new_pos.
-static void crossline_refreash (const char *prompt, char *buf, int *pCurPos, int *pCurNum, int new_pos, int new_num)
+static int crossline_updown_move (const char *prompt, int *pCurPos, int *pCurNum, int off)
 {
-	int i = *pCurPos, rows, cols, ch, cur_num = *pCurNum;
+	int rows, cols, len = (int)strlen(prompt), cur_pos=*pCurPos;
 	crossline_screen_get (&rows, &cols);
-	cols -= (int)strlen(prompt) + 1;
-
-	buf[new_num] = '\0';
-	for (i = *pCurPos>cols?cols:*pCurPos; i > 0; --i)	{ printf ("\b"); }	// move cursor to beginning
-	if (new_pos > cols) {
-		ch = buf[new_pos];
-		buf[new_pos] = '\0';
-		printf ("%s", &buf[new_pos-cols]);
-		buf[new_pos] = (char)ch;
+	if (*pCurPos == *pCurNum)	{ return 0; }
+	if (off < 0) {
+		if ((*pCurPos+len)/cols == 0) { return 0; }
+		*pCurPos -= cols;
+		if (*pCurPos < 0) { *pCurPos = 0; }
+		crossline_cursor_move (-1, (*pCurPos+len)%cols-(cur_pos+len)%cols);
 	} else {
-		if (new_num > cols) {
-			ch = buf[cols]; buf[cols] = '\0';
-			printf ("%s", buf);
-			buf[cols] = (char)ch;
-			for (i=cols-new_pos; i > 0; --i)	{ printf ("\b"); } // move cursor to new_pos
+		if ((*pCurPos+len)/cols == (*pCurNum+len)/cols) { return 0; }
+		*pCurPos += cols;
+		if (*pCurPos > *pCurNum) { *pCurPos = *pCurNum - 1; } // one char left in case history shortcut
+		crossline_cursor_move (1, (*pCurPos+len)%cols-(cur_pos+len)%cols);
+	}
+	return 1;
+}
+
+// Refreash current print line and move cursor to new_pos.
+static void crossline_refreash (const char *prompt, char *buf, int *pCurPos, int *pCurNum, int new_pos, int new_num, int bChg)
+{
+	int i, rows, cols, pos_row, pos_col, len = (int)strlen(prompt);
+	crossline_screen_get (&rows, &cols);
+
+	if (!bChg) { // just move cursor
+		pos_row = (new_pos+len)/cols - (*pCurPos+len)/cols;
+		pos_col = (new_pos+len)%cols - (*pCurPos+len)%cols;
+		crossline_cursor_move (pos_row, pos_col);
+	} else {
+		buf[new_num] = '\0';
+		if (bChg > 1) { // refreash as less as possbile
+			printf ("%s", &buf[bChg-1]);
 		} else {
-			printf ("%s", buf);
-			if (cur_num > cols) { cur_num = cols; }
-			for (i = cur_num - new_num; i > 0; --i)	{ printf (" "); } // clear previous extra print
-			i = ((cur_num > new_num) ? cur_num : new_num) - new_pos;
-			for (; i > 0; --i)	{ printf ("\b"); } // move cursor to new_pos
+			pos_row = (*pCurPos + len) / cols;
+			crossline_cursor_move (-pos_row, 0);
+			printf ("\r%s%s", prompt, buf);
 		}
+		if (!s_crossline_win && new_num>0 && !((new_num+len)%cols)) { printf("\n"); }
+		for (i=*pCurNum-new_num; i > 0; --i) { printf (" "); }
+		if (!s_crossline_win && *pCurNum>new_num && !((*pCurNum+len)%cols)) { printf("\n"); }
+		pos_row = (new_num+len)/cols - (*pCurNum+len)/cols;
+		if (pos_row < 0) { crossline_cursor_move (pos_row, 0); } 
+		printf ("\r");
+		pos_row = (new_pos+len)/cols - (new_num+len)/cols;
+		crossline_cursor_move (pos_row, (new_pos+len)%cols);
 	}
 	*pCurPos = new_pos;
 	*pCurNum = new_num;
@@ -669,9 +797,8 @@ static void crossline_refreash (const char *prompt, char *buf, int *pCurPos, int
 
 static void crossline_print (const char *prompt, char *buf, int *pCurPos, int *pCurNum, int new_pos, int new_num)
 {
-	printf ("%s", prompt);
 	*pCurPos = *pCurNum = 0;
-	crossline_refreash (prompt, buf, pCurPos, pCurNum, new_pos, new_num);
+	crossline_refreash (prompt, buf, pCurPos, pCurNum, new_pos, new_num, 1);
 }
 
 // Copy part text[cut_beg, cut_end] from src to dest
@@ -690,7 +817,7 @@ static void crossline_history_copy (const char *prompt, char *buf, int size, int
 {
 	strncpy (buf, s_history_buf[history_id % CROSS_HISTORY_MAX_LINE], size - 1);
 	buf[size - 1] = '\0';
-	crossline_refreash (prompt, buf, pos, num, (int)strlen(buf), (int)strlen(buf));
+	crossline_refreash (prompt, buf, pos, num, (int)strlen(buf), (int)strlen(buf), 1);
 }
 
 /*****************************************************************************/
@@ -733,13 +860,6 @@ static int crossline_key_mapping (int ch)
 }
 
 #ifdef _WIN32	// Windows
-// Read a character from keyboard.
-static int crossline_getch (void)
-{
-	fflush (stdout);
-	return _getch();
-}
-
 // Read a KEY from keyboard, is_esc indicats whether it's a function key.
 static int crossline_getkey (int *is_esc)
 {
@@ -761,23 +881,6 @@ static int crossline_getkey (int *is_esc)
 }
 
 #else // Linux
-
-// Read a character from keyboard
-static int crossline_getch ()
-{
-	char ch = 0;
-	struct termios old_term, cur_term;
-	fflush (stdout);
-	if (tcgetattr(0, &old_term) < 0)	{ perror("tcsetattr()"); }
-	cur_term = old_term;
-	cur_term.c_lflag &= ~(ICANON | ECHO | ISIG); // echoing off, canonical off, no signal chars
-	cur_term.c_cc[VMIN] = 1;
-	cur_term.c_cc[VTIME] = 0;
-	if (tcsetattr(0, TCSANOW, &cur_term) < 0)	{ perror("tcsetattr ICANON"); }
-	if (read(0, &ch, 1) < 0)	{ perror("read()"); }
-	if (tcsetattr(0, TCSADRAIN, &old_term) < 0)	{ perror("tcsetattr ~ICANON"); }
-	return ch;
-}
 
 // Convert escape sequences to internal special function key
 static int crossline_get_esckey (int ch)
@@ -819,15 +922,15 @@ static int crossline_getkey (int *is_esc)
 	}
 	return ch;
 }
-#endif
+
+#endif // #ifdef _WIN32
 
 /*****************************************************************************/
 
-/* Internal readline from terminal
- * has_input indicates buf has inital input.
+/* Internal readline from terminal. has_input indicates buf has inital input.
  * in_his will disable history and complete shortcuts
  */
-static char* crossline_readline_input (char *buf, int size, const char *prompt, int has_input, int in_his)
+static char* crossline_readline_edit (char *buf, int size, const char *prompt, int has_input, int in_his)
 {
 	int		pos = 0, num = 0, read_end = 0, is_esc;
 	int		ch, len, new_pos, copy_buf = 0, i, len2;
@@ -866,13 +969,13 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case KEY_LEFT:	// Move back a character.
 		case CTRL_KEY('B'):
 			if (pos > 0)
-				{ crossline_refreash (prompt, buf, &pos, &num, pos-1, num); }
+				{ crossline_refreash (prompt, buf, &pos, &num, pos-1, num, 0); }
 			break;
 
 		case KEY_RIGHT:	// Move forward a character.
 		case CTRL_KEY('F'):
 			if (pos < num)
-				{ crossline_refreash (prompt, buf, &pos, &num, pos+1, num); }
+				{ crossline_refreash (prompt, buf, &pos, &num, pos+1, num, 0); }
 			break;
 
 		case ALT_KEY('b'):	// Move back a word.
@@ -881,7 +984,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case KEY_ALT_LEFT:
 			for (new_pos=pos-1; (new_pos > 0) && isdelim(buf[new_pos]); --new_pos)	;
 			for (; (new_pos > 0) && !isdelim(buf[new_pos]); --new_pos)	;
-			crossline_refreash (prompt, buf, &pos, &num, new_pos?new_pos+1:new_pos, num);
+			crossline_refreash (prompt, buf, &pos, &num, new_pos?new_pos+1:new_pos, num, 0);
 			break;
 
 		case ALT_KEY('f'):	 // Move forward a word.
@@ -890,25 +993,21 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case KEY_ALT_RIGHT:
 			for (new_pos=pos; (new_pos < num) && isdelim(buf[new_pos]); ++new_pos)	;
 			for (; (new_pos < num) && !isdelim(buf[new_pos]); ++new_pos)	;
-			crossline_refreash (prompt, buf, &pos, &num, new_pos, num);
+			crossline_refreash (prompt, buf, &pos, &num, new_pos, num, 0);
 			break;
 
 		case CTRL_KEY('A'):	// Move cursor to start of line.
 		case KEY_HOME:
-			crossline_refreash (prompt, buf, &pos, &num, 0, num);
+			crossline_refreash (prompt, buf, &pos, &num, 0, num, 0);
 			break;
 
 		case CTRL_KEY('E'):	// Move cursor to end of line
 		case KEY_END:
-			crossline_refreash (prompt, buf, &pos, &num, num, num);
+			crossline_refreash (prompt, buf, &pos, &num, num, num, 0);
 			break;
 
 		case CTRL_KEY('L'):	// Clear screen and redisplay line
-#ifdef _WIN32
-			system ("cls");
-#else
-			system ("clear");
-#endif
+			system (s_crossline_win ? "cls" : "clear");
 			crossline_print (prompt, buf, &pos, &num, pos, num);
 			break;
 
@@ -916,7 +1015,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case KEY_BACKSPACE: // Delete char to left of cursor (same with CTRL_KEY('H'))
 			if (pos > 0) {
 				memmove (&buf[pos-1], &buf[pos], num - pos);
-				crossline_refreash (prompt, buf, &pos, &num, pos-1, num-1);
+				crossline_refreash (prompt, buf, &pos, &num, pos-1, num-1, 1);
 			}
 			break;
 
@@ -924,7 +1023,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case CTRL_KEY('D'):
 			if (pos < num) {
 				memmove (&buf[pos], &buf[pos+1], num - pos - 1);
-				crossline_refreash (prompt, buf, &pos, &num, pos, num - 1);
+				crossline_refreash (prompt, buf, &pos, &num, pos, num - 1, 1);
 			} else if ((0 == num) && (ch == CTRL_KEY('D'))) // On an empty line, EOF
 				 { printf (" \b\n"); fflush(stdout); return NULL; }
 			break;
@@ -936,7 +1035,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			for (new_pos = pos; (new_pos < num) && isdelim(buf[new_pos]); ++new_pos)	;
 			for (; (new_pos < num) && !isdelim(buf[new_pos]); ++new_pos)
 				{ buf[new_pos] = (char)toupper (buf[new_pos]); }
-			crossline_refreash (prompt, buf, &pos, &num, new_pos, num);
+			crossline_refreash (prompt, buf, &pos, &num, new_pos, num, 1);
 			break;
 
 		case ALT_KEY('l'):	// Lowercase current or following word.
@@ -946,7 +1045,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			for (new_pos = pos; (new_pos < num) && isdelim(buf[new_pos]); ++new_pos)	;
 			for (; (new_pos < num) && !isdelim(buf[new_pos]); ++new_pos)
 				{ buf[new_pos] = (char)tolower (buf[new_pos]); }
-			crossline_refreash (prompt, buf, &pos, &num, new_pos, num);
+			crossline_refreash (prompt, buf, &pos, &num, new_pos, num, 1);
 			break;
 
 		case ALT_KEY('c'):	// Capitalize current or following word.
@@ -955,16 +1054,16 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			if (new_pos<num)
 				{ buf[new_pos] = (char)toupper (buf[new_pos]); }
 			for (; new_pos<num && !isdelim(buf[new_pos]); ++new_pos)	;
-			crossline_refreash (prompt, buf, &pos, &num, new_pos, num);
+			crossline_refreash (prompt, buf, &pos, &num, new_pos, num, 1);
 			break;
 
 		case ALT_KEY('\\'): // Delete whitespace around cursor.
 			for (new_pos = pos; (new_pos > 0) && (' ' == buf[new_pos]); --new_pos)	;
 			memmove (&buf[new_pos], &buf[pos], num - pos);
-			crossline_refreash (prompt, buf, &pos, &num, new_pos, num - (pos-new_pos));
+			crossline_refreash (prompt, buf, &pos, &num, new_pos, num - (pos-new_pos), 1);
 			for (new_pos = pos; (new_pos < num) && (' ' == buf[new_pos]); ++new_pos)	;
 			memmove (&buf[pos], &buf[new_pos], num - new_pos);
-			crossline_refreash (prompt, buf, &pos, &num, pos, num - (new_pos-pos));
+			crossline_refreash (prompt, buf, &pos, &num, pos, num - (new_pos-pos), 1);
 			break;
 
 		case CTRL_KEY('T'): // Transpose previous character with current character.
@@ -972,12 +1071,12 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 				ch = buf[pos];
 				buf[pos] = buf[pos-1];
 				buf[pos-1] = (char)ch;
-				crossline_refreash (prompt, buf, &pos, &num, pos<num?pos+1:pos, num);
+				crossline_refreash (prompt, buf, &pos, &num, pos<num?pos+1:pos, num, 1);
 			} else if ((pos > 1) && !isdelim(buf[pos-1]) && !isdelim(buf[pos-2])) {
 				ch = buf[pos-1];
 				buf[pos-1] = buf[pos-2];
 				buf[pos-2] = (char)ch;
-				crossline_refreash (prompt, buf, &pos, &num, pos, num);
+				crossline_refreash (prompt, buf, &pos, &num, pos, num, 1);
 			}
 			break;
 
@@ -986,7 +1085,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case KEY_CTRL_END:
 		case KEY_ALT_END:
 			crossline_text_copy (s_clip_buf, buf, pos, num);
-			crossline_refreash (prompt, buf, &pos, &num, pos, pos);
+			crossline_refreash (prompt, buf, &pos, &num, pos, pos, 1);
 			break;
 
 		case CTRL_KEY('U'): // Cut from start of line to cursor.
@@ -994,7 +1093,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 		case KEY_ALT_HOME:
 			crossline_text_copy (s_clip_buf, buf, 0, pos);
 			memmove (&buf[0], &buf[pos], num-pos);
-			crossline_refreash (prompt, buf, &pos, &num, 0, num - pos);
+			crossline_refreash (prompt, buf, &pos, &num, 0, num - pos, 1);
 			break;
 
 		case CTRL_KEY('X'):	// Cut whole line.
@@ -1002,7 +1101,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			// fall through
 		case ALT_KEY('r'):	// Revert line
 		case ALT_KEY('R'):
-			crossline_refreash (prompt, buf, &pos, &num, 0, 0);
+			crossline_refreash (prompt, buf, &pos, &num, 0, 0, 1);
 			break;
 
 		case CTRL_KEY('W'): // Cut whitespace (not word) to left of cursor.
@@ -1019,7 +1118,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			if ((new_pos>0) && (new_pos<pos) && isdelim(buf[new_pos]))	{ new_pos++; }
 			crossline_text_copy (s_clip_buf, buf, new_pos, pos);
 			memmove (&buf[new_pos], &buf[pos], num - pos);
-			crossline_refreash (prompt, buf, &pos, &num, new_pos, num - (pos-new_pos));
+			crossline_refreash (prompt, buf, &pos, &num, new_pos, num - (pos-new_pos), 1);
 			break;
 
 		case ALT_KEY('d'): // Cut word following cursor.
@@ -1030,7 +1129,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			for (; (new_pos < num) && !isdelim(buf[new_pos]); ++new_pos)	;
 			crossline_text_copy (s_clip_buf, buf, pos, new_pos);
 			memmove (&buf[pos], &buf[new_pos], num - new_pos);
-			crossline_refreash (prompt, buf, &pos, &num, pos, num - (new_pos-pos));
+			crossline_refreash (prompt, buf, &pos, &num, pos, num - (new_pos-pos), 1);
 			break;
 
 		case CTRL_KEY('Y'):	// Paste last cut text.
@@ -1039,7 +1138,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			if ((len=(int)strlen(s_clip_buf)) + num < size) {
 				memmove (&buf[pos+len], &buf[pos], num - pos);
 				memcpy (&buf[pos], s_clip_buf, len);
-				crossline_refreash (prompt, buf, &pos, &num, pos+len, num+len);
+				crossline_refreash (prompt, buf, &pos, &num, pos+len, num+len, 1);
 			}
 			break;
 
@@ -1066,7 +1165,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 						if (new_pos+i+1 < size) {
 							for (i = 0; i < len; ++i) { buf[new_pos+i] = completions.word[0][i]; }
 							if (1 == completions.num) { buf[new_pos + (i++)] = ' '; }
-							crossline_refreash (prompt, buf, &pos, &num, new_pos+i, new_pos+i);
+							crossline_refreash (prompt, buf, &pos, &num, new_pos+i, new_pos+i, 1);
 						}
 					}
 				}
@@ -1077,6 +1176,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 
 /* History Commands */
 		case KEY_UP:		// Fetch previous line in history.
+			if (crossline_updown_move (prompt, &pos, &num, -1)) { break; } // check multi line move up
 		case CTRL_KEY('P'):
 			if (in_his) { break; }
 			if (!copy_buf)
@@ -1086,6 +1186,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			break;
 
 		case KEY_DOWN:		// Fetch next line in history.
+			if (crossline_updown_move (prompt, &pos, &num, 1)) { break; } // check multi line move down
 		case CTRL_KEY('N'):
 			if (in_his) { break; }
 			if (!copy_buf)
@@ -1096,7 +1197,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 				history_id = s_history_id;
 				strncpy (buf, input, size - 1);
 				buf[size - 1] = '\0';
-				crossline_refreash (prompt, buf, &pos, &num, (int)strlen(buf), (int)strlen(buf));
+				crossline_refreash (prompt, buf, &pos, &num, (int)strlen(buf), (int)strlen(buf), 1);
 			}
 			break; //case UP/DOWN
 
@@ -1119,7 +1220,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			history_id = s_history_id;
 			strncpy (buf, input, size-1);
 			buf[size-1] = '\0';
-			crossline_refreash (prompt, buf, &pos, &num, (int)strlen(buf), (int)strlen(buf));
+			crossline_refreash (prompt, buf, &pos, &num, (int)strlen(buf), (int)strlen(buf), 1);
 			break;
 
 		case CTRL_KEY('R'):	// Search history
@@ -1157,14 +1258,14 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 /* Control Commands */
 		case KEY_ENTER:		// Accept line (same with CTRL_KEY('M'))
 		case KEY_ENTER2:	// same with CTRL_KEY('J')
-			crossline_refreash (prompt, buf, &pos, &num, num, num);
+			crossline_refreash (prompt, buf, &pos, &num, num, num, 0);
 			printf (" \b\n");
 			read_end = 1;
 			break;
 
 		case CTRL_KEY('C'):	// Abort line.
 		case CTRL_KEY('G'):
-			crossline_refreash (prompt, buf, &pos, &num, num, num);
+			crossline_refreash (prompt, buf, &pos, &num, num, num, 0);
 			if (CTRL_KEY('C') == ch)	{ printf (" \b^C\n"); }
 			else	{ printf (" \b\n"); }
 			num = pos = 0;
@@ -1183,7 +1284,7 @@ static char* crossline_readline_input (char *buf, int size, const char *prompt, 
 			if (!is_esc && isprint(ch) && (num < size-1)) {
 				memmove (&buf[pos+1], &buf[pos], num - pos);
 				buf[pos] = (char)ch;
-				crossline_refreash (prompt, buf, &pos, &num, pos+1, num+1);
+				crossline_refreash (prompt, buf, &pos, &num, pos+1, num+1, pos+1);
 				copy_buf = 0;
 			}
 			break;

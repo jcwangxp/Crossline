@@ -14,13 +14,15 @@ When should you use Crossline:
 * [Features and Highlights](#Features-and-Highlights)
 * [Background](#Background)
 * [Shortcuts](#Shortcuts)
+* [Multiple Line Mode](#Multiple-Line-Mode)
 * [History Search](#History-Search)
 * [Keyboard Debug](#Keyboard-Debug)
 * [Embedded Help](#Embedded-Help)
 * [Extend Crossline](#Extend-Crossline)
 * [Customized Config](#Customized-Config)
 * [Crossline APIs](#Crossline-APIs)
-* [Paging APIs Example](#Paging-APIs-Example)
+* [Paging APIs](#Paging-APIs)
+* [Cursor APIs](#Cursor-APIs)
 * [Simple Example](#Simple-Example)
 * [SQL Parser Example](#SQL-Parser-Example)
 * [Build and Test](#build-and-Test)
@@ -29,26 +31,27 @@ When should you use Crossline:
 
 ## Features and Highlights
 
-* Support Windows, Linux, vt100 and xterm.
-* Support total `79 shortcuts` and `37 functions`.
+* Support many platforms: Windows, Linux, vt100 and xterm.
+* Support total `79 shortcuts` and `40 functions`.
 * Support most readline shortcuts (Emacs Standard bindings): move, edit, cut&paste, complete, history, control.
+* Support fast move between lines with `Up` `Down` keys in multiple line edit mode.
 * Support some Windows command line shortcuts and extend some new convenient shortcuts.
 * Support history navigation, history show/clear and history save/load.
 * Support autocomplete, key word help and syntax hints.
 * Support powerful interactive history search with multiple case insensitive including and excluding match patterns.
 * Support same edit shortcuts (except complete and history shortcuts) in history search mode.
 * Support autocomplete, history show/search, help info paging with auto resizing.
-* Support common APIs for paing control.
+* Support cross platform paging control APIs.
+* Support cross platform cursor control APIs.
 * Support convenient embedded `F1` help in edit and history search mode, and you can call it anytime without losing current input.
 * Support convenient embedded `Ctrl-^` keyboard debug mode to watch key code sequences.
 * Support `Ctrl-C` to exit edit and `Ctrl-Z` to suspend and resume job(Linux) in both edit and search mode.
 * Support pipe as input.
 * Pure C MIT license source code, no 3rd library dependency.
 * No any dynamic memory operations: malloc/free/realloc/new/delete/strdup/etc.
-* Very small only about 1000 LOC, and code logic is simple and easy to read.
+* Very small only about 1100 LOC, and code logic is simple and easy to read.
 * Easy to customize your own shortcuts and new features.
-* Only single line edit mode is supported now.
-* Unicode is not supported yet.
+* Unicode is to be supported later.
 
 ## Background
 
@@ -73,6 +76,8 @@ Shortcut                | Action
 ---------               | ------
 Ctrl-B, Left            |   Move back a character.
 Ctrl-F, Right           |   Move forward a character.
+Up                      |   Move cursor to up line. (For multiple lines)
+Down                    |   Move cursor to down line. (For multiple lines)
 Alt-B, ESC+Left, Ctrl-Left, Alt-Left    | Move back a word. (Ctrl-Left, Alt-Left only support Windows/Xterm)
 Alt-F, ESC+Right, Ctrl-Right, Alt-Right | Move forward a word. (Ctrl-Right, Alt-Right only support Windows/Xterm)
 Ctrl-A, Home            |   Move cursor to start of line.
@@ -114,8 +119,8 @@ Alt-=, Alt-?            |   List possible completions.
 
 Shortcut                | Action
 ---------               | ------
-Ctrl-P, Up              |   Fetch previous line in history.
-Ctrl-N, Down            |   Fetch next line in history.
+Ctrl-P, Up              |   Fetch previous line in history. (Up works when cursor in first line or end of last line)
+Ctrl-N, Down            |   Fetch next line in history. (Down works when cursor in last line)
 Alt-<,  PgUp            |   Move to first line in history.
 Alt->,  PgDn            |   Move to end of input history.
 Ctrl-R, Ctrl-S          |   Search history.
@@ -136,6 +141,7 @@ Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 
 **Notes**
 
+* In multiple lines, Up/Down will move between lines. Up will fetch history when in first line or end of last line(for quick history move), and Down will fetch history when in last line.
 * For Windows and xterm, almost all shortcuts are supported.
 * For some terminal tools you need to enable Alt as meta key.
   SecureCRT: check `Terminal->Emulation->Emacs->use ALT as meta key`
@@ -153,6 +159,22 @@ Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 * SecureCRT xterm doesn't support: `Ctrl-Home`, `Alt-Home`, `Ctrl-End`, `Alt-End`, `Alt-Del`, `Ctrl-Del`, `Clt-Backspace`.
 
 [Goto Top](#Catalogue)
+
+
+## Multiple Line Mode
+
+Crossline supports multiple line edit mode like readline. If you input a very long line and then you want to edit some part many lines above, it's not convenient to move to the position quickly even with Ctrl+Left. I used to copy input text to a GUI editor like notepad++, then edit and copy back. 
+
+To move quickly in multiple lines, I implemented a multiple line edit mode like other editors and reuse the `Up` `Down` key to move between lines quickly. To keep the original history shortcuts, the key behavior will behave as  following.
+
+* For single line, `Up` `Down` key are history shortcuts.
+* In first line of multiple lines, `Down` key will move to below line, `Up` key will fetch previous history.
+* In middle line of multiple lines, `Down` key will move to below line, `Up` key will move to above line.
+* In last line(cursor not at end) of multiple lines, `Down` key will fetch next history, `Up` key will move to above line.
+* In last line(cursor at end) of multiple lines, `Up` `Down` key are history shortcuts. This is to keep navigating history quickly.
+* `Ctrl-P` `Ctrl-N` history shortcuts are not changed.
+
+So if you want to move quickly between lines, make sure the cursor is not at end of last line, and if you want to navigate history quickly, make sure the cursor is at end of last line in multiple lines.
 
 
 ## History Search
@@ -266,6 +288,8 @@ Press `Ctrl-C` to exit.
      +-------------------------+--------------------------------------------------+
      | Ctrl-B, Left            |  Move back a character.                          |
      | Ctrl-F, Right           |  Move forward a character.                       |
+     | Up                      |  Move cursor to up line. (For multiple lines)    |
+     | Down                    |  Move cursor to down line. (For multiple lines)  |
      | Alt-B, ESC+Left,        |  Move back a word.                               |
      |    Ctrl-Left, Alt-Left  |  (Ctrl-Left, Alt-Left only support Windows/Xterm)|
     *** Press <Space> or <Enter> to continue . . .
@@ -317,7 +341,9 @@ Please add case and action code in `crossline_readline_input`.
 You can refer existing case of similar action to write your new action.
 Use `crossline_refreash` to print line after updating buf.
 
-[Goto Top](#Catalogue)
+**Debug your code**
+
+It's not easy to debug with print or debugger tools like GDB for terminal tools, and you can use `crossline_debug("xxx",...)` to print debug information to file `crossline_debug.txt`.
 
 
 ## Customized Config
@@ -335,7 +361,7 @@ You can modify it or use `crossline_delimiter_set` to change it.
 The history line len can be less than user buf len, and it'll cut to history line len when storing to history buf.
 ```c
 #define CROSS_HISTORY_MAX_LINE       256         // Maximum history line number
-#define CROSS_HISTORY_BUF_LEN        1024        // History line length
+#define CROSS_HISTORY_BUF_LEN        4096        // History line length
 #define CROSS_HIS_MATCH_PAT_NUM      16          // History search pattern number
 ```
 
@@ -343,9 +369,11 @@ The history line len can be less than user buf len, and it'll cut to history lin
 ```c
 #define CROSS_COMPLET_MAX_LINE        512        // Maximum completion word number
 #define CROSS_COMPLET_WORD_LEN        64         // Completion word length
-#define CROSS_COMPLET_HELP_LEN        128        // Completion word's help length
+#define CROSS_COMPLET_HELP_LEN        256        // Completion word's help length
 #define CROSS_COMPLET_HINT_LEN        128        // Completion syntax hints length
 ```
+
+[Goto Top](#Catalogue)
 
 
 ## Crossline APIs
@@ -354,12 +382,16 @@ The history line len can be less than user buf len, and it'll cut to history lin
 // Main API to read a line, return buf if get line, return NULL if EOF.
 char* crossline_readline (const char *prompt, char *buf, int size);
 
-// Set move/cut word delimiter, default is all not digital and alphabetic characters
+// Set move/cut word delimiter, default is all not digital and alphabetic characters.
 void  crossline_delimiter_set (const char *delim);
 
+// Read a character from terminal without echo
+int	 crossline_getch (void);
+```
 
-/* History APIs */
+* History APIs
 
+```c
 // Save history to file
 int   crossline_history_save (const char *filename);
 
@@ -371,9 +403,13 @@ void  crossline_history_show (void);
 
 // Clear history
 void  crossline_history_clear (void);
+```
 
+* Completion APIs
 
-/* Completion APIs */
+```c
+typedef struct crossline_completions_t crossline_completions_t;
+typedef void (*crossline_completion_callback) (const char *buf, crossline_completions_t *pCompletions);
 
 // Register completion callback
 void  crossline_completion_register (crossline_completion_callback pCbFunc);
@@ -385,38 +421,32 @@ void  crossline_completion_add (crossline_completions_t *pCompletions, const cha
 void  crossline_hints_set (crossline_completions_t *pCompletions, const char *hints);
 ```
 
-[Goto Top](#Catalogue)
 
+## Paging APIs
 
-## Paging APIs Example
-
-These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make thme open.
+These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make them open.
 
 ```c
-/* Paging APIs */
-// Get screen rows and columns
-void crossline_screen_get (int *rows, int *cols);
-
-// Reset paging before starting paing control
+// Reset paging before starting paging control
 void crossline_paging_reset (void);
 
 // Check paging after print a line, return 1 means quit, 0 means continue
-// if you know only one line is printed, just give print_line = 1
-int  crossline_paging_check (int print_line);
+// if you know only one line is printed, just give line_len = 1
+int  crossline_paging_check (int line_len);
 ```
 
 example.c
 ```c
 static void pagint_test ()
 {
-	int i;
-	crossline_paging_reset ();
-	for (i = 0; i < 256; ++i) {
-		printf ("Paging test: %3d\n", i);
-		if (crossline_paging_check (sizeof("paging test: ") + 3)) {
-			break;
-		}
-	}
+    int i;
+    crossline_paging_reset ();
+    for (i = 0; i < 256; ++i) {
+        printf ("Paging test: %3d\n", i);
+        if (crossline_paging_check (sizeof("paging test: ") + 3)) {
+            break;
+        }
+    }
 }
 ```
 
@@ -432,6 +462,35 @@ It'll work as following:
 	Paging test:   5
 	Paging test:   6
 	*** Press <Space> or <Enter> to continue . . .
+
+
+## Cursor APIs
+
+These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make them open and write some APIs which are not used by crossline at all.
+
+```c
+// Get screen rows and columns
+void crossline_screen_get (int *pRows, int *pCols);
+
+// Get cursor postion (0 based)
+int  crossline_cursor_get (int *pRow, int *pCol);
+
+// Set cursor postion (0 based)
+void crossline_cursor_set (int row, int col);
+
+/* Move cursor with row and column offset, 
+ *   row_off > 0 move up row_off lines, 
+ *           < 0 move down abs(row_off) lines
+ *           = 0 no move for row, 
+ *   similar with col_off
+ */
+void crossline_cursor_move (int row_off, int col_off);
+
+// Hide or show cursor
+void crossline_cursor_hide (int bHide);
+```
+
+[Goto Top](#Catalogue)
 
 
 ## Simple Example
@@ -506,8 +565,6 @@ You can use this example to practice the shortcuts above.
 
     SQL> create index <TAB> // show autocomplete hints
     Please input: index name
-
-[Goto Top](#Catalogue)
 
 
 ## Build and Test

@@ -48,7 +48,7 @@ static void pagint_test ()
 
 int main ()
 {
-	char buf[256];
+	char buf[1024];
 
 	crossline_completion_register (completion_hook);
 	crossline_history_load ("history.txt");
