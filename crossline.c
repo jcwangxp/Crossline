@@ -775,9 +775,10 @@ static int crossline_updown_move (const char *prompt, int *pCurPos, int *pCurNum
 // Refreash current print line and move cursor to new_pos.
 static void crossline_refreash (const char *prompt, char *buf, int *pCurPos, int *pCurNum, int new_pos, int new_num, int bChg)
 {
-	int i, rows, cols, pos_row, pos_col, len = (int)strlen(prompt);
-	crossline_screen_get (&rows, &cols);
+	int i, pos_row, pos_col, len = (int)strlen(prompt);
+	static int rows = 0, cols = 0;
 
+	if (bChg || !rows || s_crossline_win) { crossline_screen_get (&rows, &cols); }
 	if (!bChg) { // just move cursor
 		pos_row = (new_pos+len)/cols - (*pCurPos+len)/cols;
 		pos_col = (new_pos+len)%cols - (*pCurPos+len)%cols;
@@ -975,9 +976,11 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 		ch = crossline_getkey (&is_esc);
 		ch = crossline_key_mapping (ch);
 
-		if (s_got_resize) {
-			system (s_crossline_win ? "cls" : "clear");
-			crossline_print (prompt, buf, &pos, &num, pos, num);
+		if (s_got_resize) { // Handle window resizing for Linux, Windows can handle it automatically
+			new_pos = pos;
+			crossline_refreash (prompt, buf, &pos, &num, 0, num, 0); // goto beginning of line
+			printf ("\e[J"); // clear to end of screen
+			crossline_refreash (prompt, buf, &pos, &num, new_pos, num, 1);
 			s_got_resize = 0;
 		}
 
