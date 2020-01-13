@@ -34,13 +34,15 @@ When should you use Crossline:
 * Support many platforms: Windows, Linux, vt100 and xterm.
 * Support total `79 shortcuts` and `40 functions`.
 * Support most readline shortcuts (Emacs Standard bindings): move, edit, cut&paste, complete, history, control.
-* Support fast move between lines with `Up` `Down` keys in multiple line edit mode.
+* Support fast move between lines with `Up` `Down` and `Ctrl/Alt+Up` `Ctrl/Alt+Down` keys in multiple line edit mode.
 * Support some Windows command line shortcuts and extend some new convenient shortcuts.
 * Support history navigation, history show/clear and history save/load.
+* Support readline with initial input for editing.
 * Support autocomplete, key word help and syntax hints.
 * Support powerful interactive history search with multiple case insensitive including and excluding match patterns.
 * Support same edit shortcuts (except complete and history shortcuts) in history search mode.
-* Support autocomplete, history show/search, help info paging with auto resizing.
+* Support auto resizing when editing window/terminal size changed.
+* Support autocomplete, history show/search, help info paging.
 * Support cross platform paging control APIs.
 * Support cross platform cursor control APIs.
 * Support convenient embedded `F1` help in edit and history search mode, and you can call it anytime without losing current input.
@@ -77,9 +79,11 @@ Shortcut                | Action
 Ctrl-B, Left            |   Move back a character.
 Ctrl-F, Right           |   Move forward a character.
 Up                      |   Move cursor to up line. (For multiple lines)
-Down                    |   Move cursor to down line. (For multiple lines)
-Alt-B, ESC+Left, Ctrl-Left, Alt-Left    | Move back a word. (Ctrl-Left, Alt-Left only support Windows/Xterm)
-Alt-F, ESC+Right, Ctrl-Right, Alt-Right | Move forward a word. (Ctrl-Right, Alt-Right only support Windows/Xterm)
+Ctrl-Up, Alt-Up, ESC+Up |   Move cursor to up line. (Ctrl-Up, Alt-Up only supports Windows/Xterm)
+Down                    |   Move cursor to down line. (Ctrl-Down, Alt-Down only support Windows/Xterm)
+Ctrl-Down, Alt-Down, ESC+Down |   Move cursor to down line. (Ctrl-Down, Alt-Down only support Windows/Xterm)
+Alt-B, Ctrl-Left, Alt-Left, ESC+Left    | Move back a word. (Ctrl-Left, Alt-Left only support Windows/Xterm)
+Alt-F, Ctrl-Right, Alt-Right, ESC+Right | Move forward a word. (Ctrl-Right, Alt-Right only support Windows/Xterm)
 Ctrl-A, Home            |   Move cursor to start of line.
 Ctrl-E, End             |   Move cursor to end of line.
 Ctrl-L                  |   Clear screen and redisplay line.
@@ -90,8 +94,8 @@ Shortcut                | Action
 ---------               | ------
 Ctrl-H, Backspace       |   Delete character before cursor.
 Ctrl-D, DEL             |   Delete character under cursor.
-Alt-U,  ESC+Up, Ctrl-Up, Alt-Up      | Uppercase current or following word.(Ctrl-Up, Alt-Up only supports Windows/Xterm)
-Alt-L, ESC+Down, Ctrl-Down, Alt-Down | Lowercase current or following word. (Ctrl-Down, Alt-Down only support Windows/Xterm)
+Alt-U                   |   Uppercase current or following word.
+Alt-L                   |   Lowercase current or following word.
 Alt-C                   |   Capitalize current or following word.
 Alt-\                   |   Delete whitespace around cursor.
 Ctrl-T                  |   Transpose previous character with current character.
@@ -100,11 +104,11 @@ Ctrl-T                  |   Transpose previous character with current character.
 
 Shortcut                | Action
 ---------               | ------
-Ctrl-K, ESC+End, Ctrl-End, Alt-End       | Cut from cursor to end of line. (Ctrl-End, Alt-End only support Windows/Xterm)
-Ctrl-U, ESC+Home, Ctrl-Home, Alt-Home    | Cut from start of line to cursor. (Ctrl-Home, Alt-Home only support Windows/Xterm)
+Ctrl-K, Ctrl-End, Alt-End, ESC+End       | Cut from cursor to end of line. (Ctrl-End, Alt-End only support Windows/Xterm)
+Ctrl-U, Ctrl-Home, Alt-Home, ESC+Home    | Cut from start of line to cursor. (Ctrl-Home, Alt-Home only support Windows/Xterm)
 Ctrl-X                  |   Cut whole line.
-Alt-Backspace, Esc+Backspace, Clt-Backspace  | Cut word to left of cursor. (Clt-Backspace only supports Windows/Xterm)
-Alt-D, ESC+Del, Alt-Del, Ctrl-Del        | Cut word following cursor. (Alt-Del,Ctrl-Del only support Windows/Xterm)
+Alt-Backspace, Clt-Backspace, Esc+Backspace  | Cut word to left of cursor. (Clt-Backspace only supports Windows/Xterm)
+Alt-D, Alt-Del, Ctrl-Del, ESC+Del        | Cut word following cursor. (Alt-Del,Ctrl-Del only support Windows/Xterm)
 Ctrl-W                  |   Cut to left till whitespace (not word).
 Ctrl-Y, Ctrl-V, Insert  |   Paste last cut text.
 
@@ -141,7 +145,7 @@ Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 
 **Notes**
 
-* In multiple lines, Up/Down will move between lines. Up will fetch history when in first line or end of last line(for quick history move), and Down will fetch history when in last line.
+* In multiple lines, `Up/Down` can move between lines. `Up` will fetch history when in first line or end of last line(for quick history move), and `Down` will fetch history when in last line.
 * For Windows and xterm, almost all shortcuts are supported.
 * For some terminal tools you need to enable Alt as meta key.
   SecureCRT: check `Terminal->Emulation->Emacs->use ALT as meta key`
@@ -165,7 +169,7 @@ Ctrl-Z                  |   Suspend Job. (Linux only, fg will resume edit)
 
 Crossline supports multiple line edit mode like readline. If you input a very long line and then you want to edit some part many lines above, it's not convenient to move to the position quickly even with Ctrl+Left. I used to copy input text to a GUI editor like notepad++, then edit and copy back. 
 
-To move quickly in multiple lines, I implemented a multiple line edit mode like other editors and reuse the `Up` `Down` key to move between lines quickly. To keep the original history shortcuts, the key behavior will behave as  following.
+To move quickly in multiple lines, I implemented a multiple line edit mode like other editors and can use `Ctrl/Alt+Up` `Ctrl/Alt+Down` to move between lines quickly. You can also use `Up` `Down` key and to keep the original history shortcuts, the key behavior will behave as following:
 
 * For single line, `Up` `Down` key are history shortcuts.
 * In first line of multiple lines, `Down` key will move to below line, `Up` key will fetch previous history.
@@ -174,7 +178,7 @@ To move quickly in multiple lines, I implemented a multiple line edit mode like 
 * In last line(cursor at end) of multiple lines, `Up` `Down` key are history shortcuts. This is to keep navigating history quickly.
 * `Ctrl-P` `Ctrl-N` history shortcuts are not changed.
 
-So if you want to move quickly between lines, make sure the cursor is not at end of last line, and if you want to navigate history quickly, make sure the cursor is at end of last line in multiple lines.
+So if you want to use `Up` `Down` to move quickly between lines, make sure the cursor is not at end of last line, and if you want to navigate history quickly with `Up` `Down`, make sure the cursor is at end of last line in multiple lines.
 
 
 ## History Search
@@ -279,7 +283,7 @@ Press `Ctrl-C` to exit.
 **Edit mode**
 
     SQL> <F1>
-    Misc Commands
+     Misc Commands
      +-------------------------+--------------------------------------------------+
      | F1                      |  Show edit shortcuts help.                       |
      | Ctrl-^                  |  Enter keyboard debugging mode.                  |
@@ -288,10 +292,12 @@ Press `Ctrl-C` to exit.
      +-------------------------+--------------------------------------------------+
      | Ctrl-B, Left            |  Move back a character.                          |
      | Ctrl-F, Right           |  Move forward a character.                       |
-     | Up                      |  Move cursor to up line. (For multiple lines)    |
-     | Down                    |  Move cursor to down line. (For multiple lines)  |
+     | Up, ESC+Up              |  Move cursor to up line. (For multiple lines)    |
+     |   Ctrl-Up, Alt-Up       |  (Ctrl-Up, Alt-Up only supports Windows/Xterm)   |
+     | Down, ESC+Down          |  Move cursor to down line. (For multiple lines)  |
+     |   Ctrl-Down,Alt-Down    |  (Ctrl-Down, Alt-Down only support Windows/Xterm)|
      | Alt-B, ESC+Left,        |  Move back a word.                               |
-     |    Ctrl-Left, Alt-Left  |  (Ctrl-Left, Alt-Left only support Windows/Xterm)|
+     |   Ctrl-Left, Alt-Left   |  (Ctrl-Left, Alt-Left only support Windows/Xterm)|
     *** Press <Space> or <Enter> to continue . . .
 
 **Search mode**
@@ -381,6 +387,9 @@ The history line len can be less than user buf len, and it'll cut to history lin
 ```c
 // Main API to read a line, return buf if get line, return NULL if EOF.
 char* crossline_readline (const char *prompt, char *buf, int size);
+
+// Same with crossline_readline except buf holding initial input for editing.
+char* crossline_readline2 (const char *prompt, char *buf, int size);
 
 // Set move/cut word delimiter, default is all not digital and alphabetic characters.
 void  crossline_delimiter_set (const char *delim);
@@ -580,7 +589,7 @@ On Windows, you can add the source code to a Visual Studio project to build or e
 
     clang -D_CRT_SECURE_NO_WARNINGS -Wall -lUser32 crossline.c example.c -o example.exe
     clang -D_CRT_SECURE_NO_WARNINGS -Wall -lUser32 crossline.c example_sql.c -o example_sql.exe
-    
+
 **GCC(Linux, MinGW, Cygwin, MSYS2)**
 
     gcc -Wall crossline.c example.c -o example

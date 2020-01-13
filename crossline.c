@@ -199,6 +199,7 @@ static uint32_t s_history_id = 0; // Increase always, wrap until UINT_MAX
 static char 	s_clip_buf[CROSS_HISTORY_BUF_LEN]; // Buf to store cut text
 static crossline_completion_callback s_completion_callback = NULL;
 static int		s_paging_print_line = 0; // For paging control
+static int		s_got_resize = 0; // Window size changed
 
 static char* 	crossline_readline_edit (char *buf, int size, const char *prompt, int has_input, int in_his);
 static int		crossline_history_dump (FILE *file, int print_id, char *patterns, int sel_id, int paging);
@@ -230,10 +231,12 @@ static char* s_crossline_help[] = {
 " +-------------------------+--------------------------------------------------+",
 " | Ctrl-B, Left            |  Move back a character.                          |",
 " | Ctrl-F, Right           |  Move forward a character.                       |",
-" | Up                      |  Move cursor to up line. (For multiple lines)    |",
-" | Down                    |  Move cursor to down line. (For multiple lines)  |",
+" | Up, ESC+Up              |  Move cursor to up line. (For multiple lines)    |",
+" |   Ctrl-Up, Alt-Up       |  (Ctrl-Up, Alt-Up only supports Windows/Xterm)   |",
+" | Down, ESC+Down          |  Move cursor to down line. (For multiple lines)  |",
+" |   Ctrl-Down,Alt-Down    |  (Ctrl-Down, Alt-Down only support Windows/Xterm)|",
 " | Alt-B, ESC+Left,        |  Move back a word.                               |",
-" |    Ctrl-Left, Alt-Left  |  (Ctrl-Left, Alt-Left only support Windows/Xterm)|",
+" |   Ctrl-Left, Alt-Left   |  (Ctrl-Left, Alt-Left only support Windows/Xterm)|",
 " | Alt-F, ESC+Right,       |  Move forward a word.                            |",
 " |   Ctrl-Right, Alt-Right | (Ctrl-Right,Alt-Right only support Windows/Xterm)|",
 " | Ctrl-A, Home            |  Move cursor to start of line.                   |",
@@ -244,12 +247,10 @@ static char* s_crossline_help[] = {
 " +-------------------------+--------------------------------------------------+",
 " | Ctrl-H, Backspace       |  Delete character before cursor.                 |",
 " | Ctrl-D, DEL             |  Delete character under cursor.                  |",
-" | Alt-U,  ESC+Up,         |  Uppercase current or following word.            |",
-" |   Ctrl-Up,  Alt-Up      |  (Ctrl-Up, Alt-Up only supports Windows/Xterm)   |",
-" | Alt-L,  ESC+Down,       |  Lowercase current or following word.            |",
-" |   Ctrl-Down, Alt-Down   |  (Ctrl-Down, Alt-Down only support Windows/Xterm)|",
+" | Alt-U                   |  Uppercase current or following word.            |",
+" | Alt-L                   |  Lowercase current or following word.            |",
 " | Alt-C                   |  Capitalize current or following word.           |",
-" | Alt-\\                   |  Delete whitespace around cursor.                |",
+" | Alt-\\                  |  Delete whitespace around cursor.                |",
 " | Ctrl-T                  |  Transpose character.                            |",
 " +-------------------------+--------------------------------------------------+",
 " Cut&Paste Commands",
@@ -293,9 +294,10 @@ static char* s_crossline_help[] = {
 " | Ctrl-Z                  |  Suspend Job. (Linux Only, fg will resume edit)  |",
 " +-------------------------+--------------------------------------------------+",
 " Note: If Alt-key doesn't work, an alternate way is to press ESC first then press key, see above ESC+Key.",
-" Note: In multiple lines, Up/Down will move between lines.",
+" Note: In multiple lines, Up/Down and Ctrl/Alt-Up, Ctrl/Alt-Down will move between lines.",
 "       Up key will fetch history when cursor in first line or end of last line(for quick history move)",
-"       Down key will fetch history when in last line.",
+"       Down key will fetch history when cursor in last line.",
+"       Ctrl/Alt-Up, Ctrl/Alt-Down will just move between lines.",
 NULL};
 
 static char* s_search_help[] = {
@@ -314,13 +316,12 @@ NULL};
 /*****************************************************************************/
 
 // Main API to read a line, return buf if get line, return NULL if EOF.
-char* crossline_readline (const char *prompt, char *buf, int size)
+static char* crossline_readline_internal (const char *prompt, char *buf, int size, int has_input)
 {
 	int not_support = 0, len;
 
 	if ((NULL == buf) || (size <= 1))
 		{ return NULL; }
-	buf[0] = '\0';
 	if (!isatty(STDIN_FILENO)) {  // input is not from a terminal
 		not_support = 1;
 	} else {
@@ -338,7 +339,15 @@ char* crossline_readline (const char *prompt, char *buf, int size)
         return buf;
 	}
 
-	return crossline_readline_edit (buf, size, prompt, 0, 0);
+	return crossline_readline_edit (buf, size, prompt, has_input, 0);
+}
+char* crossline_readline (const char *prompt, char *buf, int size)
+{
+	return crossline_readline_internal (prompt, buf, size, 0);
+}
+char* crossline_readline2 (const char *prompt, char *buf, int size)
+{
+	return crossline_readline_internal (prompt, buf, size, 1);
 }
 
 // Set move/cut word delimiter, defaut is all not digital and alphabetic characters.
@@ -520,7 +529,7 @@ int crossline_getch ()
 	cur_term.c_cc[VMIN] = 1;
 	cur_term.c_cc[VTIME] = 0;
 	if (tcsetattr(STDIN_FILENO, TCSANOW, &cur_term) < 0)	{ perror("tcsetattr"); }
-	if (read(STDIN_FILENO, &ch, 1) < 0)	{ perror("read()"); }
+	if (read(STDIN_FILENO, &ch, 1) < 0)	{ /* perror("read()"); */ } // signal will interrupt
 	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &old_term) < 0)	{ perror("tcsetattr"); }
 	return ch;
 }
@@ -744,20 +753,20 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 	return ret;
 }
 
-static int crossline_updown_move (const char *prompt, int *pCurPos, int *pCurNum, int off)
+static int crossline_updown_move (const char *prompt, int *pCurPos, int *pCurNum, int off, int bForce)
 {
 	int rows, cols, len = (int)strlen(prompt), cur_pos=*pCurPos;
 	crossline_screen_get (&rows, &cols);
-	if (*pCurPos == *pCurNum)	{ return 0; }
+	if (!bForce && (*pCurPos == *pCurNum))	{ return 0; } // at end of last line
 	if (off < 0) {
-		if ((*pCurPos+len)/cols == 0) { return 0; }
+		if ((*pCurPos+len)/cols == 0) { return 0; } // at first line
 		*pCurPos -= cols;
 		if (*pCurPos < 0) { *pCurPos = 0; }
 		crossline_cursor_move (-1, (*pCurPos+len)%cols-(cur_pos+len)%cols);
 	} else {
-		if ((*pCurPos+len)/cols == (*pCurNum+len)/cols) { return 0; }
+		if ((*pCurPos+len)/cols == (*pCurNum+len)/cols) { return 0; } // at last line
 		*pCurPos += cols;
-		if (*pCurPos > *pCurNum) { *pCurPos = *pCurNum - 1; } // one char left in case history shortcut
+		if (*pCurPos > *pCurNum) { *pCurPos = *pCurNum - 1; } // one char left to avoid history shortcut
 		crossline_cursor_move (1, (*pCurPos+len)%cols-(cur_pos+len)%cols);
 	}
 	return 1;
@@ -880,6 +889,8 @@ static int crossline_getkey (int *is_esc)
 	return ch;
 }
 
+void crossline_winchg_reg (void)	{ }
+
 #else // Linux
 
 // Convert escape sequences to internal special function key
@@ -923,6 +934,18 @@ static int crossline_getkey (int *is_esc)
 	return ch;
 }
 
+static void crossline_winchg_event (int arg)
+{ s_got_resize = 1; }
+static void crossline_winchg_reg (void)
+{
+	struct sigaction sa;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sa.sa_handler = &crossline_winchg_event;
+	sigaction (SIGWINCH, &sa, NULL);
+	s_got_resize = 0;
+}
+
 #endif // #ifdef _WIN32
 
 /*****************************************************************************/
@@ -945,11 +968,18 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 	} else
 		{ buf[0] = input[0] = '\0'; }
 	crossline_print (prompt, buf, &pos, &num, pos, num);
+	crossline_winchg_reg ();
 
 	do {
 		is_esc = 0;
 		ch = crossline_getkey (&is_esc);
 		ch = crossline_key_mapping (ch);
+
+		if (s_got_resize) {
+			system (s_crossline_win ? "cls" : "clear");
+			crossline_print (prompt, buf, &pos, &num, pos, num);
+			s_got_resize = 0;
+		}
 
 		switch (ch) {
 /* Misc Commands */
@@ -1011,6 +1041,16 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 			crossline_print (prompt, buf, &pos, &num, pos, num);
 			break;
 
+		case KEY_CTRL_UP: // Move to up line
+		case KEY_ALT_UP:
+			crossline_updown_move (prompt, &pos, &num, -1, 1);
+			break;
+
+		case KEY_ALT_DOWN: // Move to down line
+		case KEY_CTRL_DOWN:
+			crossline_updown_move (prompt, &pos, &num, 1, 1);
+			break;
+
 /* Edit Commands */
 		case KEY_BACKSPACE: // Delete char to left of cursor (same with CTRL_KEY('H'))
 			if (pos > 0) {
@@ -1030,8 +1070,6 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 
 		case ALT_KEY('u'):	// Uppercase current or following word.
 		case ALT_KEY('U'):
-		case KEY_CTRL_UP:
-		case KEY_ALT_UP:
 			for (new_pos = pos; (new_pos < num) && isdelim(buf[new_pos]); ++new_pos)	;
 			for (; (new_pos < num) && !isdelim(buf[new_pos]); ++new_pos)
 				{ buf[new_pos] = (char)toupper (buf[new_pos]); }
@@ -1040,8 +1078,6 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 
 		case ALT_KEY('l'):	// Lowercase current or following word.
 		case ALT_KEY('L'):
-		case KEY_ALT_DOWN:
-		case KEY_CTRL_DOWN:
 			for (new_pos = pos; (new_pos < num) && isdelim(buf[new_pos]); ++new_pos)	;
 			for (; (new_pos < num) && !isdelim(buf[new_pos]); ++new_pos)
 				{ buf[new_pos] = (char)tolower (buf[new_pos]); }
@@ -1176,7 +1212,7 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 
 /* History Commands */
 		case KEY_UP:		// Fetch previous line in history.
-			if (crossline_updown_move (prompt, &pos, &num, -1)) { break; } // check multi line move up
+			if (crossline_updown_move (prompt, &pos, &num, -1, 0)) { break; } // check multi line move up
 		case CTRL_KEY('P'):
 			if (in_his) { break; }
 			if (!copy_buf)
@@ -1186,7 +1222,7 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 			break;
 
 		case KEY_DOWN:		// Fetch next line in history.
-			if (crossline_updown_move (prompt, &pos, &num, 1)) { break; } // check multi line move down
+			if (crossline_updown_move (prompt, &pos, &num, 1, 0)) { break; } // check multi line move down
 		case CTRL_KEY('N'):
 			if (in_his) { break; }
 			if (!copy_buf)

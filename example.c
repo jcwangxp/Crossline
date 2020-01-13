@@ -48,11 +48,16 @@ static void pagint_test ()
 
 int main ()
 {
-	char buf[1024];
+	char buf[1024]="select ";
 
 	crossline_completion_register (completion_hook);
 	crossline_history_load ("history.txt");
 
+	// Readline with initail text input
+	if (NULL != crossline_readline2 ("Crossline> ", buf, sizeof(buf))) {
+		printf ("Read line: \"%s\"\n", buf);
+	}
+	// Readline loop
 	while (NULL != crossline_readline ("Crossline> ", buf, sizeof(buf))) {
 		printf ("Read line: \"%s\"\n", buf);
 		if (!strcmp (buf, "paging")) {

@@ -42,6 +42,8 @@ extern "C" {
 
 // Main API to read a line, return buf if get line, return NULL if EOF.
 extern char* crossline_readline (const char *prompt, char *buf, int size);
+// Same with crossline_readline except buf holding initial input for editing.
+extern char* crossline_readline2 (const char *prompt, char *buf, int size);
 
 // Set move/cut word delimiter, default is all not digital and alphabetic characters.
 extern void  crossline_delimiter_set (const char *delim);
