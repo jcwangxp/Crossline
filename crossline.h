@@ -40,8 +40,39 @@
 extern "C" {
 #endif
 
+typedef enum {
+	CROSSLINE_FGCOLOR_DEFAULT       = 0x00,
+	CROSSLINE_FGCOLOR_BLACK         = 0x01,
+	CROSSLINE_FGCOLOR_RED           = 0x02,
+	CROSSLINE_FGCOLOR_GREEN         = 0x03,
+	CROSSLINE_FGCOLOR_YELLOW        = 0x04,
+	CROSSLINE_FGCOLOR_BLUE          = 0x05,
+	CROSSLINE_FGCOLOR_MAGENTA       = 0x06,
+	CROSSLINE_FGCOLOR_CYAN          = 0x07,
+	CROSSLINE_FGCOLOR_WHITE     	= 0x08,
+	CROSSLINE_FGCOLOR_BRIGHT     	= 0x80,
+	CROSSLINE_FGCOLOR_MASK     	    = 0x7F,
+
+	CROSSLINE_BGCOLOR_DEFAULT       = 0x0000,
+	CROSSLINE_BGCOLOR_BLACK         = 0x0100,
+	CROSSLINE_BGCOLOR_RED           = 0x0200,
+	CROSSLINE_BGCOLOR_GREEN         = 0x0300,
+	CROSSLINE_BGCOLOR_YELLOW        = 0x0400,
+	CROSSLINE_BGCOLOR_BLUE          = 0x0500,
+	CROSSLINE_BGCOLOR_MAGENTA       = 0x0600,
+	CROSSLINE_BGCOLOR_CYAN          = 0x0700,
+	CROSSLINE_BGCOLOR_WHITE     	= 0x0800,
+	CROSSLINE_BGCOLOR_BRIGHT     	= 0x8000,
+	CROSSLINE_BGCOLOR_MASK     	    = 0x7F00,
+
+	CROSSLINE_UNDERLINE     	    = 0x10000,
+
+	CROSSLINE_COLOR_DEFAULT         = CROSSLINE_FGCOLOR_DEFAULT | CROSSLINE_BGCOLOR_DEFAULT
+} crossline_color_e;
+
 // Main API to read a line, return buf if get line, return NULL if EOF.
 extern char* crossline_readline (const char *prompt, char *buf, int size);
+
 // Same with crossline_readline except buf holding initial input for editing.
 extern char* crossline_readline2 (const char *prompt, char *buf, int size);
 
@@ -82,8 +113,15 @@ extern void  crossline_completion_register (crossline_completion_callback pCbFun
 // Add completion in callback. Word is must, help for word is optional.
 extern void  crossline_completion_add (crossline_completions_t *pCompletions, const char *word, const char *help);
 
+// Add completion with color.
+extern void  crossline_completion_add_color (crossline_completions_t *pCompletions, const char *word, 
+														crossline_color_e wcolor, const char *help, crossline_color_e hcolor);
+
 // Set syntax hints in callback
 extern void  crossline_hints_set (crossline_completions_t *pCompletions, const char *hints);
+
+// Set syntax hints with color
+extern void  crossline_hints_set_color (crossline_completions_t *pCompletions, const char *hints, crossline_color_e color);
 
 
 /*
@@ -105,6 +143,9 @@ extern int  crossline_paging_check (int line_len);
 // Get screen rows and columns
 extern void crossline_screen_get (int *pRows, int *pCols);
 
+// Clear current screen
+extern void crossline_screen_clear (void);
+
 // Get cursor postion (0 based)
 extern int  crossline_cursor_get (int *pRow, int *pCol);
 
@@ -117,6 +158,18 @@ extern void crossline_cursor_move (int row_off, int col_off);
 
 // Hide or show cursor
 extern void crossline_cursor_hide (int bHide);
+
+
+/* 
+ * Color APIs
+ */
+
+// Set text color, CROSSLINE_COLOR_DEFAULT will revert to default setting
+// `\t` is not supported in Linux terminal, same below. Don't use `\n` in Linux terminal, same below.
+extern void crossline_color_set (crossline_color_e color);
+
+// Set default prompt color
+extern void crossline_prompt_color_set (crossline_color_e color);
 
 #ifdef __cplusplus
 }

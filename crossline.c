@@ -191,6 +191,9 @@ typedef struct crossline_completions_t {
 	char	word[CROSS_COMPLET_MAX_LINE][CROSS_COMPLET_WORD_LEN];
 	char	help[CROSS_COMPLET_MAX_LINE][CROSS_COMPLET_HELP_LEN];
 	char	hints[CROSS_COMPLET_HINT_LEN];
+	crossline_color_e	color_word[CROSS_COMPLET_MAX_LINE];
+	crossline_color_e	color_help[CROSS_COMPLET_MAX_LINE];
+	crossline_color_e	color_hints;
 } crossline_completions_t;
 
 static char		s_word_delimiter[64] = CROSS_DFT_DELIMITER;
@@ -199,7 +202,8 @@ static uint32_t s_history_id = 0; // Increase always, wrap until UINT_MAX
 static char 	s_clip_buf[CROSS_HISTORY_BUF_LEN]; // Buf to store cut text
 static crossline_completion_callback s_completion_callback = NULL;
 static int		s_paging_print_line = 0; // For paging control
-static int		s_got_resize = 0; // Window size changed
+static int		s_got_resize 		= 0; // Window size changed
+static crossline_color_e s_prompt_color = CROSSLINE_COLOR_DEFAULT;
 
 static char* 	crossline_readline_edit (char *buf, int size, const char *prompt, int has_input, int in_his);
 static int		crossline_history_dump (FILE *file, int print_id, char *patterns, int sel_id, int paging);
@@ -294,7 +298,8 @@ static char* s_crossline_help[] = {
 " | Ctrl-Z                  |  Suspend Job. (Linux Only, fg will resume edit)  |",
 " +-------------------------+--------------------------------------------------+",
 " Note: If Alt-key doesn't work, an alternate way is to press ESC first then press key, see above ESC+Key.",
-" Note: In multiple lines, Up/Down and Ctrl/Alt-Up, Ctrl/Alt-Down will move between lines.",
+" Note: In multiple lines:",
+"       Up/Down and Ctrl/Alt-Up, Ctrl/Alt-Down will move between lines.",
 "       Up key will fetch history when cursor in first line or end of last line(for quick history move)",
 "       Down key will fetch history when cursor in last line.",
 "       Ctrl/Alt-Up, Ctrl/Alt-Down will just move between lines.",
@@ -416,27 +421,39 @@ void crossline_completion_register (crossline_completion_callback pCbFunc)
 }
 
 // Add completion in callback. Word is must, help for word is optional.
-void crossline_completion_add (crossline_completions_t *pCompletions, const char *word, const char *help)
+void  crossline_completion_add_color (crossline_completions_t *pCompletions, const char *word, 
+											crossline_color_e wcolor, const char *help, crossline_color_e hcolor)
 {
 	if ((NULL != pCompletions) && (NULL != word) && (pCompletions->num < CROSS_COMPLET_MAX_LINE)) {
 		strncpy (pCompletions->word[pCompletions->num], word, CROSS_COMPLET_WORD_LEN - 1);
 		pCompletions->word[pCompletions->num][CROSS_COMPLET_WORD_LEN - 1] = '\0';
+		pCompletions->color_word[pCompletions->num] = wcolor;
 		pCompletions->help[pCompletions->num][0] = '\0';
 		if (NULL != help) {
 			strncpy (pCompletions->help[pCompletions->num], help, CROSS_COMPLET_HELP_LEN - 1);
 			pCompletions->help[pCompletions->num][CROSS_COMPLET_HELP_LEN - 1] = '\0';
+			pCompletions->color_help[pCompletions->num] = hcolor;
 		}
 		pCompletions->num++;
 	}
 }
+void crossline_completion_add (crossline_completions_t *pCompletions, const char *word, const char *help)
+{
+	crossline_completion_add_color (pCompletions, word, CROSSLINE_COLOR_DEFAULT, help, CROSSLINE_COLOR_DEFAULT);
+}
 
 // Set syntax hints in callback.
-void crossline_hints_set (crossline_completions_t *pCompletions, const char *hints)
+void  crossline_hints_set_color (crossline_completions_t *pCompletions, const char *hints, crossline_color_e color)
 {
 	if ((NULL != pCompletions) && (NULL != hints)) {
 		strncpy (pCompletions->hints, hints, CROSS_COMPLET_HINT_LEN - 1);
 		pCompletions->hints[CROSS_COMPLET_HINT_LEN - 1] = '\0';
+		pCompletions->color_hints = color;
 	}
+}
+void crossline_hints_set (crossline_completions_t *pCompletions, const char *hints)
+{
+	crossline_hints_set_color (pCompletions, hints, CROSSLINE_COLOR_DEFAULT);
 }
 
 /*****************************************************************************/
@@ -467,6 +484,16 @@ int crossline_paging_check (int line_len)
 }
 
 /*****************************************************************************/
+
+void  crossline_prompt_color_set (crossline_color_e color)
+{
+	s_prompt_color	= color;
+}
+
+void crossline_screen_clear ()
+{
+	system (s_crossline_win ? "cls" : "clear");
+}
 
 #ifdef _WIN32	// Windows
 
@@ -514,6 +541,48 @@ void crossline_cursor_hide (int bHide)
 	GetConsoleCursorInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
 	inf.bVisible = !bHide;
 	SetConsoleCursorInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
+}
+
+void crossline_color_set (crossline_color_e color)
+{
+    CONSOLE_SCREEN_BUFFER_INFO info;
+	static WORD dft_wAttributes = 0;
+	WORD wAttributes = 0;
+	if (!dft_wAttributes) {
+		GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
+		dft_wAttributes = info.wAttributes;
+	}
+	if (CROSSLINE_FGCOLOR_DEFAULT == (color&CROSSLINE_FGCOLOR_MASK)) {
+		wAttributes |= dft_wAttributes & (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	} else {
+		wAttributes |= (color&CROSSLINE_FGCOLOR_BRIGHT) ? FOREGROUND_INTENSITY : 0;
+		switch (color&CROSSLINE_FGCOLOR_MASK) {
+			case CROSSLINE_FGCOLOR_RED:  	wAttributes |= FOREGROUND_RED;	break;
+			case CROSSLINE_FGCOLOR_GREEN:  	wAttributes |= FOREGROUND_GREEN;break;
+			case CROSSLINE_FGCOLOR_BLUE:  	wAttributes |= FOREGROUND_BLUE;	break;
+			case CROSSLINE_FGCOLOR_YELLOW:  wAttributes |= FOREGROUND_RED | FOREGROUND_GREEN;	break;
+			case CROSSLINE_FGCOLOR_MAGENTA: wAttributes |= FOREGROUND_RED | FOREGROUND_BLUE;	break;
+			case CROSSLINE_FGCOLOR_CYAN:	wAttributes |= FOREGROUND_GREEN | FOREGROUND_BLUE;	break;
+			case CROSSLINE_FGCOLOR_WHITE:   wAttributes |= FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;break;
+		}
+	}
+	if (CROSSLINE_BGCOLOR_DEFAULT == (color&CROSSLINE_BGCOLOR_MASK)) {
+		wAttributes |= dft_wAttributes & (BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY);
+	} else {
+		wAttributes |= (color&CROSSLINE_BGCOLOR_BRIGHT) ? BACKGROUND_INTENSITY : 0;
+		switch (color&CROSSLINE_BGCOLOR_MASK) {
+			case CROSSLINE_BGCOLOR_RED:  	wAttributes |= BACKGROUND_RED;	break;
+			case CROSSLINE_BGCOLOR_GREEN:  	wAttributes |= BACKGROUND_GREEN;break;
+			case CROSSLINE_BGCOLOR_BLUE:  	wAttributes |= BACKGROUND_BLUE;	break;
+			case CROSSLINE_BGCOLOR_YELLOW:  wAttributes |= BACKGROUND_RED | BACKGROUND_GREEN;	break;
+			case CROSSLINE_BGCOLOR_MAGENTA: wAttributes |= BACKGROUND_RED | BACKGROUND_BLUE;	break;
+			case CROSSLINE_BGCOLOR_CYAN:	wAttributes |= BACKGROUND_GREEN | BACKGROUND_BLUE;	break;
+			case CROSSLINE_BGCOLOR_WHITE:   wAttributes |= BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE;break;
+		}
+	}
+	if (color & CROSSLINE_UNDERLINE)
+		{ wAttributes |= COMMON_LVB_UNDERSCORE; }
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), wAttributes);
 }
 
 #else // Linux
@@ -570,6 +639,17 @@ void crossline_cursor_move (int row_off, int col_off)
 void crossline_cursor_hide (int bHide)
 {
 	printf("\e[?25%c", bHide?'l':'h');
+}
+
+void crossline_color_set (crossline_color_e color)
+{
+	printf ("\033[m");
+	if (CROSSLINE_FGCOLOR_DEFAULT != (color&CROSSLINE_FGCOLOR_MASK)) 
+		{ printf ("\033[%dm", 29 + (color&CROSSLINE_FGCOLOR_MASK) + ((color&CROSSLINE_FGCOLOR_BRIGHT)?60:0)); }
+	if (CROSSLINE_BGCOLOR_DEFAULT != (color&CROSSLINE_BGCOLOR_MASK)) 
+		{ printf ("\033[%dm", 39 + ((color&CROSSLINE_BGCOLOR_MASK)>>8) + ((color&CROSSLINE_BGCOLOR_BRIGHT)?60:0)); }
+	if (color & CROSSLINE_UNDERLINE)
+		{ printf ("\033[4m"); }
 }
 
 #endif // #ifdef _WIN32
@@ -714,8 +794,13 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 		ret = 1;
 	}
 	// Print syntax hints.
-	if ('\0' != pCompletions->hints[0])
-		{ printf ("Please input: %s\n", pCompletions->hints); }
+	if ('\0' != pCompletions->hints[0]) {
+		printf ("Please input: "); 
+		crossline_color_set (pCompletions->color_hints);
+		printf ("%s", pCompletions->hints); 
+		crossline_color_set (CROSSLINE_COLOR_DEFAULT);
+		printf ("\n");
+	}
 	if (0 == pCompletions->num)	{ return ret; }
 	for (i = 0; i < pCompletions->num; ++i) {
 		if ((int)strlen(pCompletions->word[i]) > word_len)
@@ -725,10 +810,14 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 	if (with_help) {
 		// Print words with help format.
 		for (i = 0; i < pCompletions->num; ++i) {
+			crossline_color_set (pCompletions->color_word[i]);
 			printf ("%s", pCompletions->word[i]);
 			for (j = 0; j < 4+word_len-(int)strlen(pCompletions->word[i]); ++j)
 				{ printf (" "); }
-			printf ("%s\n", pCompletions->help[i]);
+			crossline_color_set (pCompletions->color_help[i]);
+			printf ("%s", pCompletions->help[i]);
+			crossline_color_set (CROSSLINE_COLOR_DEFAULT);
+			printf ("\n");
 			if (crossline_paging_check((int)strlen(pCompletions->help[i])+4+word_len+1))
 				{ break; }
 		}
@@ -739,7 +828,9 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 	crossline_screen_get (&rows, &cols);
 	word_num = (cols - 1 - word_len) / (word_len + 4) + 1;
 	for (i = 1; i <= pCompletions->num; ++i) {
+		crossline_color_set (pCompletions->color_word[i-1]);
 		printf ("%s", pCompletions->word[i-1]);
+		crossline_color_set (CROSSLINE_COLOR_DEFAULT);
 		for (j = 0; j < ((i%word_num)?4:0)+word_len-(int)strlen(pCompletions->word[i-1]); ++j)
 			{ printf (" "); }
 		if (0 == (i % word_num)) {
@@ -790,7 +881,10 @@ static void crossline_refreash (const char *prompt, char *buf, int *pCurPos, int
 		} else {
 			pos_row = (*pCurPos + len) / cols;
 			crossline_cursor_move (-pos_row, 0);
-			printf ("\r%s%s", prompt, buf);
+			crossline_color_set (s_prompt_color);
+			printf ("\r%s", prompt);
+			crossline_color_set (CROSSLINE_COLOR_DEFAULT);
+			printf ("%s", buf);
 		}
 		if (!s_crossline_win && new_num>0 && !((new_num+len)%cols)) { printf("\n"); }
 		for (i=*pCurNum-new_num; i > 0; --i) { printf (" "); }
@@ -1040,7 +1134,7 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 			break;
 
 		case CTRL_KEY('L'):	// Clear screen and redisplay line
-			system (s_crossline_win ? "cls" : "clear");
+			crossline_screen_clear ();
 			crossline_print (prompt, buf, &pos, &num, pos, num);
 			break;
 
@@ -1068,7 +1162,7 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 				memmove (&buf[pos], &buf[pos+1], num - pos - 1);
 				crossline_refreash (prompt, buf, &pos, &num, pos, num - 1, 1);
 			} else if ((0 == num) && (ch == CTRL_KEY('D'))) // On an empty line, EOF
-				 { printf (" \b\n"); fflush(stdout); return NULL; }
+				 { printf (" \b\n"); read_end = -1; }
 			break;
 
 		case ALT_KEY('u'):	// Uppercase current or following word.
@@ -1309,8 +1403,8 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 			else	{ printf (" \b\n"); }
 			num = pos = 0;
 			errno = EAGAIN;
-			fflush(stdout);
-			return NULL;
+			read_end = -1;
+			break;;
 
 		case CTRL_KEY('Z'):
 #ifndef _WIN32
@@ -1331,6 +1425,7 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 	 	fflush(stdout);
 	} while ( !read_end );
 
+	if (read_end < 0) { return NULL; }
 	if ((num > 0) && (' ' == buf[num-1]))	{ num--; }
 	buf[num] = '\0';
 	if (!in_his && (num > 0) && strcmp(buf,"history")) { // Save history

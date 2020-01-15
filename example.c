@@ -23,48 +23,28 @@ gcc -Wall crossline.c example.c -o example
 
 static void completion_hook (char const *buf, crossline_completions_t *pCompletion)
 {
-	int i;
-	static const char *cmd[] = {"insert", "select", "update", "delete", "create", "drop", "show", "describe", "help", "exit", "history", "paging", NULL};
+    int i;
+    static const char *cmd[] = {"insert", "select", "update", "delete", "create", "drop", "show", "describe", "help", "exit", "history", NULL};
 
-	for (i = 0; NULL != cmd[i]; ++i) {
-		if (0 == strncmp(buf, cmd[i], strlen(buf))) {
-			crossline_completion_add (pCompletion, cmd[i], NULL);
-		}
-	}
+    for (i = 0; NULL != cmd[i]; ++i) {
+        if (0 == strncmp(buf, cmd[i], strlen(buf))) {
+            crossline_completion_add (pCompletion, cmd[i], NULL);
+        }
+    }
 
-}
-
-static void pagint_test ()
-{
-	int i;
-	crossline_paging_reset ();
-	for (i = 0; i < 256; ++i) {
-		printf ("Paging test: %3d\n", i);
-		if (crossline_paging_check (sizeof("paging test: ") + 3)) {
-			break;
-		}
-	}
 }
 
 int main ()
 {
-	char buf[1024]="select ";
+    char buf[256];
+    
+    crossline_completion_register (completion_hook);
+    crossline_history_load ("history.txt");
 
-	crossline_completion_register (completion_hook);
-	crossline_history_load ("history.txt");
+    while (NULL != crossline_readline ("Crossline> ", buf, sizeof(buf))) {
+        printf ("Read line: \"%s\"\n", buf);
+    }    
 
-	// Readline with initail text input
-	if (NULL != crossline_readline2 ("Crossline> ", buf, sizeof(buf))) {
-		printf ("Read line: \"%s\"\n", buf);
-	}
-	// Readline loop
-	while (NULL != crossline_readline ("Crossline> ", buf, sizeof(buf))) {
-		printf ("Read line: \"%s\"\n", buf);
-		if (!strcmp (buf, "paging")) {
-			pagint_test ();
-		}
-	}
-
-	crossline_history_save ("history.txt");
-	return 0;
+    crossline_history_save ("history.txt");
+    return 0;
 }

@@ -4,9 +4,11 @@
 
 When should you use Crossline:
 * When you need a cross-platform readline: Windows, Linux, Unix, MacOS.
-* When you need a simple but versatile readline: more shortcuts, advanced search, simple autocomplete, paging, embedded help.
+* When you need a simple but versatile readline: more shortcuts, advanced search, simple autocomplete, paging, cusor APIs, color APIs, embedded help, etc.
 * When you need a customized readline: easy to extend.
 * When you need a small readline to build into program.
+
+![img](doc/crossline_sql.png)
 
 
 ## Catalogue
@@ -16,15 +18,16 @@ When should you use Crossline:
 * [Shortcuts](#Shortcuts)
 * [Multiple Line Mode](#Multiple-Line-Mode)
 * [History Search](#History-Search)
-* [Keyboard Debug](#Keyboard-Debug)
-* [Embedded Help](#Embedded-Help)
-* [Extend Crossline](#Extend-Crossline)
-* [Customized Config](#Customized-Config)
 * [Crossline APIs](#Crossline-APIs)
+* [Color APIs](#Color-APIs)
 * [Paging APIs](#Paging-APIs)
 * [Cursor APIs](#Cursor-APIs)
 * [Simple Example](#Simple-Example)
 * [SQL Parser Example](#SQL-Parser-Example)
+* [Keyboard Debug](#Keyboard-Debug)
+* [Embedded Help](#Embedded-Help)
+* [Extend Crossline](#Extend-Crossline)
+* [Customized Config](#Customized-Config)
 * [Build and Test](#build-and-Test)
 * [Related Projects](#Related-Projects)
 
@@ -41,17 +44,19 @@ When should you use Crossline:
 * Support autocomplete, key word help and syntax hints.
 * Support powerful interactive history search with multiple case insensitive including and excluding match patterns.
 * Support same edit shortcuts (except complete and history shortcuts) in history search mode.
+* Support color text for prompt, autocomplete, hints.
 * Support auto resizing when editing window/terminal size changed.
 * Support autocomplete, history show/search, help info paging.
 * Support cross platform paging control APIs.
 * Support cross platform cursor control APIs.
+* Support cross platform color control APIs.
 * Support convenient embedded `F1` help in edit and history search mode, and you can call it anytime without losing current input.
 * Support convenient embedded `Ctrl-^` keyboard debug mode to watch key code sequences.
 * Support `Ctrl-C` to exit edit and `Ctrl-Z` to suspend and resume job(Linux) in both edit and search mode.
 * Support pipe as input.
 * Pure C MIT license source code, no 3rd library dependency.
 * No any dynamic memory operations: malloc/free/realloc/new/delete/strdup/etc.
-* Very small only about 1100 LOC, and code logic is simple and easy to read.
+* Very small only about 1200 LOC, and code logic is simple and easy to read.
 * Easy to customize your own shortcuts and new features.
 * Unicode is to be supported later.
 
@@ -254,6 +259,270 @@ Patterns are separated by `' '`, patter match is `case insensitive`.
 [Goto Top](#Catalogue)
 
 
+## Crossline APIs
+
+```c
+// Main API to read a line, return buf if get line, return NULL if EOF.
+char* crossline_readline (const char *prompt, char *buf, int size);
+
+// Same with crossline_readline except buf holding initial input for editing.
+char* crossline_readline2 (const char *prompt, char *buf, int size);
+
+// Set move/cut word delimiter, default is all not digital and alphabetic characters.
+void  crossline_delimiter_set (const char *delim);
+
+// Read a character from terminal without echo
+int     crossline_getch (void);
+```
+
+* History APIs
+
+```c
+// Save history to file
+int   crossline_history_save (const char *filename);
+
+// Load history from file
+int   crossline_history_load (const char *filename);
+
+// Show history in buffer
+void  crossline_history_show (void);
+
+// Clear history
+void  crossline_history_clear (void);
+```
+
+* Completion APIs
+
+```c
+typedef struct crossline_completions_t crossline_completions_t;
+typedef void (*crossline_completion_callback) (const char *buf, crossline_completions_t *pCompletions);
+
+// Register completion callback
+void  crossline_completion_register (crossline_completion_callback pCbFunc);
+
+// Add completion in callback. Word is must, help for word is optional.
+void  crossline_completion_add (crossline_completions_t *pCompletions, const char *word, const char *help);
+
+// Set syntax hints in callback
+void  crossline_hints_set (crossline_completions_t *pCompletions, const char *hints);
+```
+
+
+## Color APIs
+
+**Color definitions**
+
+Color                           |  Note
+---------                       |  ------
+  CROSSLINE_FGCOLOR_DEFAULT     |  If not set, it's the default value.
+  CROSSLINE_FGCOLOR_BLACK       |  Set text color to black. `\t` is not supported in Linux terminal, same below
+  CROSSLINE_FGCOLOR_RED         |  Set text color to red.
+  CROSSLINE_FGCOLOR_GREEN       |  Set text color to green.
+  CROSSLINE_FGCOLOR_YELLOW      |  Set text color to yellow.
+  CROSSLINE_FGCOLOR_BLUE        |  Set text color to blue.
+  CROSSLINE_FGCOLOR_MAGENTA     |  Set text color to magenta.
+  CROSSLINE_FGCOLOR_CYAN        |  Set text color to cyan.
+  CROSSLINE_FGCOLOR_WHITE       |  Set text color to white.
+  CROSSLINE_FGCOLOR_BRIGHT      |  Set text color bright.
+  CROSSLINE_BGCOLOR_DEFAULT     |  If not set, it's the default value.
+  CROSSLINE_BGCOLOR_BLACK       |  Set background color to black. `\t` is not supported in Linux terminal, same below. Don't use `\n` in Linux terminal, same below.
+  CROSSLINE_BGCOLOR_RED         |  Set background color to red.
+  CROSSLINE_BGCOLOR_GREEN       |  Set background color to green.
+  CROSSLINE_BGCOLOR_YELLOW      |  Set background color to yellow.
+  CROSSLINE_BGCOLOR_BLUE        |  Set background color to blue.
+  CROSSLINE_BGCOLOR_MAGENTA     |  Set background color to magenta.
+  CROSSLINE_BGCOLOR_CYAN        |  Set background color to cyan.
+  CROSSLINE_BGCOLOR_WHITE       |  Set background color to white.
+  CROSSLINE_BGCOLOR_BRIGHT      |  Set background color bright.
+  CROSSLINE_UNDERLINE           |  Set text to underline style.
+  CROSSLINE_COLOR_DEFAULT       |  If not set, it's the default value.
+
+`CROSSLINE_FGCOLOR_DEFAULT`, `CROSSLINE_BGCOLOR_DEFAULT`, `CROSSLINE_COLOR_DEFAULT` are all zero, so it's fine to leave without it or just give 0.
+
+**Color APIs**
+
+```c
+// Set text color, CROSSLINE_COLOR_DEFAULT will revert to default setting
+// `\t` is not supported in Linux terminal, same below. Don't use `\n` in Linux terminal, same below.
+void crossline_color_set (crossline_color_e color);
+
+// Set default prompt color
+void crossline_prompt_color_set (crossline_color_e color);
+
+// Add completion with color.
+void  crossline_completion_add_color (crossline_completions_t *pCompletions, const char *word, 
+                                    crossline_color_e wcolor, const char *help, crossline_color_e hcolor);
+
+// Set syntax hints with color
+void  crossline_hints_set_color (crossline_completions_t *pCompletions, const char *hints, crossline_color_e color);
+
+```
+
+**Color Example**
+
+You can get the color example code in `example2.c` `color_test()`
+
+![img](doc/crossline_color.png)
+
+[Goto Top](#Catalogue)
+
+
+## Paging APIs
+
+These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make them open.
+
+```c
+// Reset paging before starting paging control
+void crossline_paging_reset (void);
+
+// Check paging after print a line, return 1 means quit, 0 means continue
+// if you know only one line is printed, just give line_len = 1
+int  crossline_paging_check (int line_len);
+```
+
+Code in `example2.c`
+```c
+static void pagint_test ()
+{
+    int i;
+    crossline_paging_reset ();
+    for (i = 0; i < 256; ++i) {
+        printf ("Paging test: %3d\n", i);
+        if (crossline_paging_check (sizeof("paging test: ") + 3)) {
+            break;
+        }
+    }
+}
+```
+
+It'll work as following:
+
+    Crossline> paging
+    Read line: "paging"
+    Paging test:   0
+    Paging test:   1
+    Paging test:   2
+    Paging test:   3
+    Paging test:   4
+    Paging test:   5
+    Paging test:   6
+    *** Press <Space> or <Enter> to continue . . .
+
+
+## Cursor APIs
+
+These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make them open and write some APIs which are not used by crossline at all.
+
+```c
+// Get screen rows and columns
+void crossline_screen_get (int *pRows, int *pCols);
+
+// Clear current screen
+void crossline_screen_clear (void);
+
+// Get cursor postion (0 based)
+int  crossline_cursor_get (int *pRow, int *pCol);
+
+// Set cursor postion (0 based)
+void crossline_cursor_set (int row, int col);
+
+/* Move cursor with row and column offset, 
+ *   row_off > 0 move up row_off lines, 
+ *           < 0 move down abs(row_off) lines
+ *           = 0 no move for row, 
+ *   similar with col_off
+ */
+void crossline_cursor_move (int row_off, int col_off);
+
+// Hide or show cursor
+void crossline_cursor_hide (int bHide);
+```
+
+[Goto Top](#Catalogue)
+
+
+## Simple Example
+
+`example.c` is a very simple example to use crossline.
+
+```c
+static void completion_hook (char const *buf, crossline_completions_t *pCompletion)
+{
+    int i;
+    static const char *cmd[] = {"insert", "select", "update", "delete", "create", "drop", "show", "describe", "help", "exit", "history", NULL};
+
+    for (i = 0; NULL != cmd[i]; ++i) {
+        if (0 == strncmp(buf, cmd[i], strlen(buf))) {
+            crossline_completion_add (pCompletion, cmd[i], NULL);
+        }
+    }
+
+}
+
+int main ()
+{
+    char buf[256];
+    
+    crossline_completion_register (completion_hook);
+    crossline_history_load ("history.txt");
+
+    while (NULL != crossline_readline ("Crossline> ", buf, sizeof(buf))) {
+        printf ("Read line: \"%s\"\n", buf);
+    }    
+
+    crossline_history_save ("history.txt");
+    return 0;
+}
+```
+
+`example2.c` is an enhanced example, which supports color, color test, paging test and have the edit with initial input example.
+
+
+## SQL Parser Example
+
+`example_sql.c`, this example implements a simple SQL syntax parser with following syntax format, please read code for details.
+
+```sql
+INSERT INTO <table> SET column1=value1,column2=value2,...
+SELECT <* | column1,columnm2,...> FROM <table> [WHERE] [ORDER BY] [LIMIT] [OFFSET]
+UPDATE <table> SET column1=value1,column2=value2 [WHERE] [ORDER BY] [LIMIT] [OFFSET]
+DELETE FROM <table> [WHERE] [ORDER BY] [LIMIT] [OFFSET]
+CREATE [UNIQUE] INDEX <name> ON <table> (column1,column2,...)
+DROP {TABLE | INDEX} <name>
+SHOW {TABLES | DATABASES}
+DESCRIBE <TABLE>
+help {INSERT | SELECT | UPDATE | DELETE | CREATE | DROP | SHOW | DESCRIBE | help | exit | history}
+```
+You can use this example to practice the shortcuts above.
+
+```sql
+SQL> <TAB>  // show autocomplete words and help
+INSERT      Insert a record to table
+SELECT      Select records from table
+UPDATE      Update records in table
+DELETE      Delete records from table
+CREATE      Create index on table
+DROP        Drop index or table
+SHOW        Show tables or databases
+DESCRIBE    Show table schema
+help        Show help for Topic
+exit        Exit shell
+history     Show history
+ *** Press <Space> or <Enter> to continue . . .
+
+SQL> help <TAB> // show autocomplete words list
+INSERT    SELECT    UPDATE    DELETE    CREATE    DROP      SHOW
+DESCRIBE  help      exit      history
+
+SQL> CREATE INDEX <TAB> // show autocomplete hints
+Please input: index name
+```
+
+![img](doc/crossline_sql.png)
+
+[Goto Top](#Catalogue)
+
+
 ## Keyboard Debug
 
 **Enter keyboard debug mode**
@@ -314,8 +583,6 @@ Press `Ctrl-C` to exit.
              choose line including "select from" and 'where'
              and excluding "order by" or 'limit'
 
-[Goto Top](#Catalogue)
-
 
 ## Extend Crossline
 
@@ -351,6 +618,8 @@ Use `crossline_refreash` to print line after updating buf.
 
 It's not easy to debug with print or debugger tools like GDB for terminal tools, and you can use `crossline_debug("xxx",...)` to print debug information to file `crossline_debug.txt`.
 
+[Goto Top](#Catalogue)
+
 
 ## Customized Config
 
@@ -379,202 +648,6 @@ The history line len can be less than user buf len, and it'll cut to history lin
 #define CROSS_COMPLET_HINT_LEN        128        // Completion syntax hints length
 ```
 
-[Goto Top](#Catalogue)
-
-
-## Crossline APIs
-
-```c
-// Main API to read a line, return buf if get line, return NULL if EOF.
-char* crossline_readline (const char *prompt, char *buf, int size);
-
-// Same with crossline_readline except buf holding initial input for editing.
-char* crossline_readline2 (const char *prompt, char *buf, int size);
-
-// Set move/cut word delimiter, default is all not digital and alphabetic characters.
-void  crossline_delimiter_set (const char *delim);
-
-// Read a character from terminal without echo
-int	 crossline_getch (void);
-```
-
-* History APIs
-
-```c
-// Save history to file
-int   crossline_history_save (const char *filename);
-
-// Load history from file
-int   crossline_history_load (const char *filename);
-
-// Show history in buffer
-void  crossline_history_show (void);
-
-// Clear history
-void  crossline_history_clear (void);
-```
-
-* Completion APIs
-
-```c
-typedef struct crossline_completions_t crossline_completions_t;
-typedef void (*crossline_completion_callback) (const char *buf, crossline_completions_t *pCompletions);
-
-// Register completion callback
-void  crossline_completion_register (crossline_completion_callback pCbFunc);
-
-// Add completion in callback. Word is must, help for word is optional.
-void  crossline_completion_add (crossline_completions_t *pCompletions, const char *word, const char *help);
-
-// Set syntax hints in callback
-void  crossline_hints_set (crossline_completions_t *pCompletions, const char *hints);
-```
-
-
-## Paging APIs
-
-These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make them open.
-
-```c
-// Reset paging before starting paging control
-void crossline_paging_reset (void);
-
-// Check paging after print a line, return 1 means quit, 0 means continue
-// if you know only one line is printed, just give line_len = 1
-int  crossline_paging_check (int line_len);
-```
-
-example.c
-```c
-static void pagint_test ()
-{
-    int i;
-    crossline_paging_reset ();
-    for (i = 0; i < 256; ++i) {
-        printf ("Paging test: %3d\n", i);
-        if (crossline_paging_check (sizeof("paging test: ") + 3)) {
-            break;
-        }
-    }
-}
-```
-
-It'll work as following:
-
-	Crossline> paging
-	Read line: "paging"
-	Paging test:   0
-	Paging test:   1
-	Paging test:   2
-	Paging test:   3
-	Paging test:   4
-	Paging test:   5
-	Paging test:   6
-	*** Press <Space> or <Enter> to continue . . .
-
-
-## Cursor APIs
-
-These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make them open and write some APIs which are not used by crossline at all.
-
-```c
-// Get screen rows and columns
-void crossline_screen_get (int *pRows, int *pCols);
-
-// Get cursor postion (0 based)
-int  crossline_cursor_get (int *pRow, int *pCol);
-
-// Set cursor postion (0 based)
-void crossline_cursor_set (int row, int col);
-
-/* Move cursor with row and column offset, 
- *   row_off > 0 move up row_off lines, 
- *           < 0 move down abs(row_off) lines
- *           = 0 no move for row, 
- *   similar with col_off
- */
-void crossline_cursor_move (int row_off, int col_off);
-
-// Hide or show cursor
-void crossline_cursor_hide (int bHide);
-```
-
-[Goto Top](#Catalogue)
-
-
-## Simple Example
-
-example.c
-```c
-static void completion_hook (char const *buf, crossline_completions_t *pCompletion)
-{
-    int i;
-    static const char *cmd[] = {"insert", "select", "update", "delete", "create", "drop", "show", "describe", "help", "exit", "history", NULL};
-
-    for (i = 0; NULL != cmd[i]; ++i) {
-        if (0 == strncmp(buf, cmd[i], strlen(buf))) {
-            crossline_completion_add (pCompletion, cmd[i], NULL);
-        }
-    }
-
-}
-
-int main ()
-{
-    char buf[256];
-    
-    crossline_completion_register (completion_hook);
-    crossline_history_load ("history.txt");
-
-    while (NULL != crossline_readline ("Crossline> ", buf, sizeof(buf))) {
-        printf ("Read line: \"%s\"\n", buf);
-    }    
-
-    crossline_history_save ("history.txt");
-    return 0;
-}
-```
-
-## SQL Parser Example
-
-example_sql.c
-
-This example implements a simple SQL syntax parser with following syntax format, please read code for details.
-
-```sql
-insert into <table> set column1=value1,column2=value2,...
-select <* | column1,columnm2,...> from <table> [where] [order by] [limit] [offset]
-update <table> set column1=value1,column2=value2 [where] [order by] [limit] [offset]
-delete from <table> [where] [order by] [limit] [offset]
-create [unique] index <name> on <table> (column1,column2,...)
-drop {table | index} <name>
-show {tables | databases}
-describe <table>
-help {insert | select | update | delete | create | drop | show | describe | help | exit | history}
-```
-You can use this example to practice the shortcuts above.
-
-    SQL> <TAB>  // show autocomplete words and help
-    insert      Insert a record to table
-    select      Select records from table
-    update      Update records in table
-    delete      Delete records from table
-    create      Create index on table
-    drop        Drop index or table
-    show        Show tables or databases
-    describe    Show table schema
-    help        Show help for Topic
-    exit        Exit shell
-    history     Show history
-     *** Press <Space> or <Enter> to continue . . .
-
-    SQL> help <TAB> // show autocomplete words list
-    insert    select    update    delete    create    drop      show
-    describe  help      exit      history
-
-    SQL> create index <TAB> // show autocomplete hints
-    Please input: index name
-
 
 ## Build and Test
 
@@ -583,21 +656,25 @@ On Windows, you can add the source code to a Visual Studio project to build or e
 **Windows MSVC**
 
     cl -D_CRT_SECURE_NO_WARNINGS -W4 User32.Lib crossline.c example.c /Feexample.exe
+    cl -D_CRT_SECURE_NO_WARNINGS -W4 User32.Lib crossline.c example2.c /Feexample2.exe
     cl -D_CRT_SECURE_NO_WARNINGS -W4 User32.Lib crossline.c example_sql.c /Feexample_sql.exe
 
 **Windows Clang**
 
     clang -D_CRT_SECURE_NO_WARNINGS -Wall -lUser32 crossline.c example.c -o example.exe
+    clang -D_CRT_SECURE_NO_WARNINGS -Wall -lUser32 crossline.c example2.c -o example2.exe
     clang -D_CRT_SECURE_NO_WARNINGS -Wall -lUser32 crossline.c example_sql.c -o example_sql.exe
 
 **GCC(Linux, MinGW, Cygwin, MSYS2)**
 
     gcc -Wall crossline.c example.c -o example
+    gcc -Wall crossline.c example2.c -o example2
     gcc -Wall crossline.c example_sql.c -o example_sql
 
 **Linux Clang**
 
     clang -Wall crossline.c example.c -o example
+    clang -Wall crossline.c example2.c -o example2
     clang -Wall crossline.c example_sql.c -o example_sql
 
 ## Related Projects
