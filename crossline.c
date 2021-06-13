@@ -59,6 +59,7 @@
 	#include <fcntl.h>
 	#include <signal.h>
 	#include <sys/ioctl.h>
+	#include <sys/stat.h>
 	static int s_crossline_win = 0;
 #endif
 
