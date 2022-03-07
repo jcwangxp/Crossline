@@ -128,8 +128,8 @@ extern void  crossline_hints_set_color (crossline_completions_t *pCompletions, c
  * Paging APIs
  */
 
-// Reset paging before starting paging control
-extern void crossline_paging_reset (void);
+// Enable/Disble paging control
+extern int crossline_paging_set (int enable);
 
 // Check paging after print a line, return 1 means quit, 0 means continue
 // if you know only one line is printed, just give line_len = 1

@@ -372,8 +372,8 @@ You can get the color example code in `example2.c` `color_test()`
 These APIs are used internally first, then I think they're common and can be used by CLI tools also, so make them open.
 
 ```c
-// Reset paging before starting paging control
-void crossline_paging_reset (void);
+// Enable/Disble paging control
+int crossline_paging_set (int enable);
 
 // Check paging after print a line, return 1 means quit, 0 means continue
 // if you know only one line is printed, just give line_len = 1
@@ -385,7 +385,7 @@ Code in `example2.c`
 static void pagint_test ()
 {
     int i;
-    crossline_paging_reset ();
+    crossline_paging_set (1);
     for (i = 0; i < 256; ++i) {
         printf ("Paging test: %3d\n", i);
         if (crossline_paging_check (sizeof("paging test: ") + 3)) {

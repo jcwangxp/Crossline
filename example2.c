@@ -62,7 +62,7 @@ static void completion_hook (char const *buf, crossline_completions_t *pCompleti
 static void pagint_test ()
 {
 	int i;
-	crossline_paging_reset ();
+	crossline_paging_set (1);
 	for (i = 0; i < 256; ++i) {
 		printf ("Paging test: %3d\n", i);
 		if (crossline_paging_check (sizeof("paging test: ") + 3)) {

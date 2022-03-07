@@ -7,7 +7,7 @@
  *
  * You can find the latest source code and description at:
  *
- *   https://github.com/JunchuanWang80/crossline
+ *   https://github.com/jcwangxp/crossline
  *
  * ------------------------------------------------------------------------
  *
@@ -48,6 +48,7 @@
 	#include <windows.h>
   #ifndef STDIN_FILENO
 	#define STDIN_FILENO 			_fileno(stdin)
+	#define STDOUT_FILENO 			_fileno(stdout)
   #endif
 	#define isatty					_isatty
 	#define strcasecmp				_stricmp
@@ -74,7 +75,7 @@
 #define CROSS_HISTORY_BUF_LEN		4096	// History line length
 #define CROSS_HIS_MATCH_PAT_NUM		16		// History search pattern number
 
-#define CROSS_COMPLET_MAX_LINE		512		// Maximum completion word number
+#define CROSS_COMPLET_MAX_LINE		1024	// Maximum completion word number
 #define CROSS_COMPLET_WORD_LEN		64		// Completion word length
 #define CROSS_COMPLET_HELP_LEN		256		// Completion word's help length
 #define CROSS_COMPLET_HINT_LEN		128		// Completion syntax hints length
@@ -381,12 +382,7 @@ int crossline_history_save (const char *filename)
 	if (NULL == filename) {
 		return -1;
 	} else {
-	#ifdef _WIN32
 		FILE *file = fopen(filename, "wt");
-	#else
-		int fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
-		FILE *file = fdopen(fd, "wt");
-	#endif
 		if (file == NULL) {	return -1;	}
 		crossline_history_dump (file, 0, NULL, 0, 0);
 		fclose(file);
@@ -426,12 +422,12 @@ void  crossline_completion_add_color (crossline_completions_t *pCompletions, con
 											crossline_color_e wcolor, const char *help, crossline_color_e hcolor)
 {
 	if ((NULL != pCompletions) && (NULL != word) && (pCompletions->num < CROSS_COMPLET_MAX_LINE)) {
-		strncpy (pCompletions->word[pCompletions->num], word, CROSS_COMPLET_WORD_LEN - 1);
+		strncpy (pCompletions->word[pCompletions->num], word, CROSS_COMPLET_WORD_LEN);
 		pCompletions->word[pCompletions->num][CROSS_COMPLET_WORD_LEN - 1] = '\0';
 		pCompletions->color_word[pCompletions->num] = wcolor;
 		pCompletions->help[pCompletions->num][0] = '\0';
 		if (NULL != help) {
-			strncpy (pCompletions->help[pCompletions->num], help, CROSS_COMPLET_HELP_LEN - 1);
+			strncpy (pCompletions->help[pCompletions->num], help, CROSS_COMPLET_HELP_LEN);
 			pCompletions->help[pCompletions->num][CROSS_COMPLET_HELP_LEN - 1] = '\0';
 			pCompletions->color_help[pCompletions->num] = hcolor;
 		}
@@ -459,27 +455,33 @@ void crossline_hints_set (crossline_completions_t *pCompletions, const char *hin
 
 /*****************************************************************************/
 
-void crossline_paging_reset (void)
-{	s_paging_print_line = 0;	}
+int crossline_paging_set (int enable)
+{
+	int prev = s_paging_print_line >=0;
+	s_paging_print_line = enable ? 0 : -1;
+	return prev;
+}
 
 int crossline_paging_check (int line_len)
 {
 	char *paging_hints = "*** Press <Space> or <Enter> to continue . . .";
 	int	i, ch, rows, cols, len = (int)strlen(paging_hints);
 
-	if (!isatty(STDIN_FILENO))	{ return 0; }
+	if ((s_paging_print_line < 0) || !isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO))	{ return 0; }
 	crossline_screen_get (&rows, &cols);
 	s_paging_print_line += (line_len + cols - 1) / cols;
 	if (s_paging_print_line >= (rows - 1)) {
 		printf ("%s", paging_hints);
 		ch = crossline_getch();
+		if (0 == ch) { crossline_getch(); }	// some terminal server may send 0 after Enter
 		// clear paging hints
 		for (i = 0; i < len; ++i) { printf ("\b"); }
 		for (i = 0; i < len; ++i) { printf (" ");  }
 		for (i = 0; i < len; ++i) { printf ("\b"); }
 		s_paging_print_line = 0;
-		if ((' ' != ch) && (KEY_ENTER != ch) && (KEY_ENTER2 != ch))
-			{ return 1; }
+		if ((' ' != ch) && (KEY_ENTER != ch) && (KEY_ENTER2 != ch)) {
+			return 1; 
+		}
 	}
 	return 0;
 }
@@ -493,7 +495,8 @@ void  crossline_prompt_color_set (crossline_color_e color)
 
 void crossline_screen_clear ()
 {
-	system (s_crossline_win ? "cls" : "clear");
+	int ret = system (s_crossline_win ? "cls" : "clear");
+	(void) ret;
 }
 
 #ifdef _WIN32	// Windows
@@ -509,7 +512,7 @@ void crossline_screen_get (int *pRows, int *pCols)
 	GetConsoleScreenBufferInfo (GetStdHandle(STD_OUTPUT_HANDLE), &inf);
 	*pCols = inf.srWindow.Right - inf.srWindow.Left + 1;
 	*pRows = inf.srWindow.Bottom - inf.srWindow.Top + 1;
-	*pCols = *pCols > 1 ? *pCols : 80;
+	*pCols = *pCols > 1 ? *pCols : 160;
 	*pRows = *pRows > 1 ? *pRows : 24;
 }
 int crossline_cursor_get (int *pRow, int *pCol)
@@ -606,10 +609,10 @@ int crossline_getch ()
 void crossline_screen_get (int *pRows, int *pCols)
 {
 	struct winsize ws = {};
-	ioctl (1, TIOCGWINSZ, &ws);
+	(void)ioctl (1, TIOCGWINSZ, &ws);
 	*pCols = ws.ws_col;
 	*pRows = ws.ws_row;
-	*pCols = *pCols > 1 ? *pCols : 80;
+	*pCols = *pCols > 1 ? *pCols : 160;
 	*pRows = *pRows > 1 ? *pRows : 24;
 }
 int crossline_cursor_get (int *pRow, int *pCol)
@@ -644,6 +647,7 @@ void crossline_cursor_hide (int bHide)
 
 void crossline_color_set (crossline_color_e color)
 {
+	if (!isatty(STDOUT_FILENO))		{ return; }
 	printf ("\033[m");
 	if (CROSSLINE_FGCOLOR_DEFAULT != (color&CROSSLINE_FGCOLOR_MASK)) 
 		{ printf ("\033[%dm", 29 + (color&CROSSLINE_FGCOLOR_MASK) + ((color&CROSSLINE_FGCOLOR_BRIGHT)?60:0)); }
@@ -661,7 +665,6 @@ static void crossline_show_help (int show_search)
 {
 	int	i;
 	char **help = show_search ? s_search_help : s_crossline_help;
-	crossline_paging_reset ();
  	printf (" \b\n");
 	for (i = 0; NULL != help[i]; ++i) {
 		printf ("%s\n", help[i]);
@@ -732,7 +735,6 @@ static int crossline_history_dump (FILE *file, int print_id, char *patterns, int
 	int		id = 0, num=0;
 	char	*pat_list[CROSS_HIS_MATCH_PAT_NUM], *history;
 
-	crossline_paging_reset ();
 	num = crossline_split_patterns (patterns, pat_list, CROSS_HIS_MATCH_PAT_NUM);
 	for (i = s_history_id; i < s_history_id + CROSS_HISTORY_MAX_LINE; ++i) {
 		history = s_history_buf[i % CROSS_HISTORY_MAX_LINE];
@@ -789,7 +791,6 @@ static int crossline_show_completions (crossline_completions_t *pCompletions)
 {
 	int i, j, ret = 0, word_len = 0, with_help = 0, rows, cols, word_num;
 
-	crossline_paging_reset ();
 	if (('\0' != pCompletions->hints[0]) || (pCompletions->num > 0)) {
 		printf (" \b\n");
 		ret = 1;
@@ -1294,6 +1295,7 @@ static char* crossline_readline_edit (char *buf, int size, const char *prompt, i
 						while ((len > 0) && strncasecmp(completions.word[0], completions.word[i], len)) { len--; }
 					}
 					if (len > 0) {
+						if (len2 > num) len2 = num;
 						while ((len2 > 0) && strncasecmp(completions.word[0], &buf[num-len2], len2)) { len2--; }
 						new_pos = num - len2;
 						if (new_pos+i+1 < size) {
