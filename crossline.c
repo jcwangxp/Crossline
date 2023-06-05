@@ -980,7 +980,7 @@ static int crossline_getkey (int *is_esc)
 		*is_esc = 1;
 		ch = crossline_getkey (&esc);
 		ch = crossline_key_esc2alt (ch);
-	} else if (GetKeyState (VK_MENU) & 0x8000) {
+	} else if (GetKeyState (VK_MENU) & 0x8000 && !(GetKeyState (VK_CONTROL) & 0x8000) ) {
 		*is_esc = 1; ch = ALT_KEY(ch);
 	}
 	return ch;
